@@ -1,0 +1,24 @@
+# CURSOR RULES: Engram Decks Mobile App
+
+project_info:
+  name: "Engram Decks Mobile"
+  stack:
+    framework: "React Native with Expo (Expo Router)"
+    language: "TypeScript (Strict mode)"
+    http_client: "Axios or native fetch"
+    backend_api: "Spring Boot REST API (/api/v1)"
+
+architecture_rules:
+  folder_structure:
+    - "app/          -> File-based routing screens (Expo Router)"
+    - "components/   -> Reusable UI components (FlashcardItem, DeckCard, RatingButtons)"
+    - "services/     -> API client functions to communicate with Spring Boot backend"
+    - "types/        -> TypeScript interfaces matching backend DTOs (Deck, Flashcard, ReviewRequest)"
+    - "constants/    -> API base URL configuration and theme colors"
+
+  coding_standards:
+    - "Always use functional components with TypeScript interfaces for props."
+    - "Keep UI components clean: NEVER put raw fetch/axios calls directly inside screen components; delegate all HTTP requests to 'services/'."
+    - "Use React Native standard StyleSheet.create() for styling to avoid external CSS library complexity."
+    - "Provide clear loading states (ActivityIndicator) and user-friendly error alerts when backend requests fail."
+    - "Explain frontend-specific concepts (useState, useEffect, navigation) concisely when generating new screens."
