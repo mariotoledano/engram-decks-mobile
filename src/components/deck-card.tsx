@@ -77,7 +77,7 @@ const styles = StyleSheet.create({
     width: COVER_WIDTH,
   },
   image: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
   },
   body: {
     flex: 1,
