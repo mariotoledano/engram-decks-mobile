@@ -1,25 +1,34 @@
-# Engram Decks Mobile 📱
+# Engram Decks Mobile
 
-Mobile client for flashcard decks. Built with React Native, Expo, and TypeScript. Designed to interact seamlessly with the Engram Decks Spring Boot REST API.
+Mobile client for flashcard decks. Built with React Native, Expo, and TypeScript. It talks to the Engram Decks Spring Boot API.
 
----
+## Requirements
 
-## 🚀 Core Technologies
+- Node.js LTS
+- The API listening on port 8080 when you want live data
 
-- **Framework:** [React Native](https://reactnative.dev/) with [Expo](https://expo.dev/) (Expo Router)
-- **Language:** [TypeScript](https://www.typescriptlang.org/) (Strict mode)
-- **Styling:** React Native StyleSheet
-- **Connectivity:** HTTP client for the Spring Boot REST backend
+## Run
 
----
+```bat
+npm install
+npx expo start
+```
 
-## 📂 Directory Structure
+On a phone, `localhost` is the phone. The app uses the Expo packager host on port 8080. Set `EXPO_PUBLIC_API_BASE_URL` to override that (Android emulator: `http://10.0.2.2:8080`).
+
+## Directory structure
 
 ```text
 engram-decks-mobile/
-├── app/          # File-based routing screens (Expo Router)
-├── components/   # Reusable UI components (Cards, review buttons, etc.)
-├── services/     # API client and HTTP requests to the backend
-├── types/        # TypeScript interfaces matching backend DTOs
-└── constants/    # API base URL configuration and color palette
+├── src/
+│   ├── app/          # File-based routes (Expo Router)
+│   ├── components/   # Reusable UI
+│   ├── services/     # HTTP calls to the API
+│   ├── types/        # TypeScript types aligned with the API DTOs
+│   └── constants/    # API base URL and theme
+├── assets/           # Icons and splash
+├── app.json
+└── package.json
 ```
+
+Screens call functions in `src/services/`. They do not call `fetch` directly.
