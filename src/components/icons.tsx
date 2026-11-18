@@ -31,6 +31,15 @@ export function SearchIcon({ color, size = 20 }: IconProps) {
   );
 }
 
+export function ArrowUpIcon({ color, size = 20 }: IconProps) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <Path d="M12 18.5V6.5" stroke={color} strokeWidth={STROKE} strokeLinecap="round" />
+      <Path d="M6.75 11.25 12 6.25l5.25 5" stroke={color} strokeWidth={STROKE} strokeLinecap="round" strokeLinejoin="round" />
+    </Svg>
+  );
+}
+
 export function EditSheetIcon({ color, size = 20 }: IconProps) {
   return (
     <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">

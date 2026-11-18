@@ -72,7 +72,7 @@ export default function HomeScreen() {
           ListHeaderComponent={
             <ThemedView style={styles.header}>
               <PrimaryButton label="Mazos" onPress={() => router.push('/decks')} />
-              <PrimaryButton label="Tarjetas" />
+              <PrimaryButton label="Tarjetas" onPress={() => router.push('/cards')} />
               <PrimaryButton label="Estudio libre" />
               <ThemedText type="smallBold">Recientes</ThemedText>
               {error ? (

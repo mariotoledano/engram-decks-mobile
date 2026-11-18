@@ -1,11 +1,20 @@
 import { useFocusEffect, useNavigation } from 'expo-router';
 import { useCallback, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { FlatList, Pressable, RefreshControl, StyleSheet, TextInput } from 'react-native';
+import {
+  FlatList,
+  Pressable,
+  RefreshControl,
+  StyleSheet,
+  TextInput,
+  type NativeScrollEvent,
+  type NativeSyntheticEvent,
+} from 'react-native';
 
 import { DeckCard } from '@/components/deck-card';
 import { DeckModeSwitch, type DeckMode } from '@/components/deck-mode-switch';
 import { ErrorView } from '@/components/error-view';
 import { LoadingView } from '@/components/loading-view';
+import { SCROLL_TOP_OFFSET, ScrollToTopButton } from '@/components/scroll-to-top-button';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { MaxContentWidth, Spacing } from '@/constants/theme';
@@ -59,8 +68,10 @@ function DeckSearchBar({ value, onChange }: DeckSearchBarProps) {
 export default function DecksScreen() {
   const theme = useTheme();
   const navigation = useNavigation();
+  const listRef = useRef<FlatList<Deck>>(null);
   const decksRef = useRef<Deck[] | null>(null);
   const [decks, setDecks] = useState<Deck[] | null>(null);
+  const [showScrollTop, setShowScrollTop] = useState(false);
   const [query, setQuery] = useState('');
   const [mode, setMode] = useState<DeckMode>('study');
   const [loading, setLoading] = useState(true);
@@ -102,6 +113,34 @@ export default function DecksScreen() {
     }, [loadDecks]),
   );
 
+  const onListScroll = useCallback((event: NativeSyntheticEvent<NativeScrollEvent>) => {
+    const visible = event.nativeEvent.contentOffset.y > SCROLL_TOP_OFFSET;
+    setShowScrollTop((current) => (current === visible ? current : visible));
+  }, []);
+
+  const scrollToTop = useCallback(() => {
+    listRef.current?.scrollToOffset({ offset: 0, animated: true });
+  }, []);
+
+  const listHeader =
+    searching || error ? (
+      <ThemedView style={styles.header}>
+        {searching ? (
+          <ThemedText type="small" themeColor="textSecondary">
+            {resultLabel(visibleDecks.length)}
+          </ThemedText>
+        ) : null}
+        {error ? (
+          <ThemedView type="backgroundElement" style={styles.banner}>
+            <ThemedText>{error}</ThemedText>
+            <Pressable accessibilityRole="button" onPress={() => void loadDecks('refresh')}>
+              <ThemedText type="linkPrimary">Reintentar</ThemedText>
+            </Pressable>
+          </ThemedView>
+        ) : null}
+      </ThemedView>
+    ) : null;
+
   return (
     <ThemedView style={styles.screen}>
       {loading && decks === null ? (
@@ -109,51 +148,44 @@ export default function DecksScreen() {
       ) : error && decks === null ? (
         <ErrorView message={error} onRetry={() => void loadDecks('initial')} />
       ) : (
-        <FlatList
-          data={visibleDecks}
-          keyExtractor={(item) => item.id}
-          keyboardShouldPersistTaps="handled"
-          contentContainerStyle={styles.list}
-          refreshControl={
-            <RefreshControl
-              refreshing={refreshing}
-              onRefresh={() => void loadDecks('refresh')}
-              tintColor={theme.text}
-              colors={[theme.text]}
-            />
-          }
-          ListHeaderComponent={
-            <ThemedView style={styles.header}>
-              <DeckSearchBar value={query} onChange={setQuery} />
-              {searching ? (
-                <ThemedText type="small" themeColor="textSecondary">
-                  {resultLabel(visibleDecks.length)}
-                </ThemedText>
-              ) : null}
-              {error ? (
-                <ThemedView type="backgroundElement" style={styles.banner}>
-                  <ThemedText>{error}</ThemedText>
-                  <Pressable accessibilityRole="button" onPress={() => void loadDecks('refresh')}>
-                    <ThemedText type="linkPrimary">Reintentar</ThemedText>
-                  </Pressable>
-                </ThemedView>
-              ) : null}
-            </ThemedView>
-          }
-          ListEmptyComponent={
-            <ThemedView style={styles.empty}>
-              {searching ? (
-                <ThemedText type="smallBold">Ningún mazo coincide con la búsqueda</ThemedText>
-              ) : (
-                <>
-                  <ThemedText type="smallBold">No hay mazos</ThemedText>
-                  <ThemedText themeColor="textSecondary">Cuando haya mazos, aparecerán aquí.</ThemedText>
-                </>
-              )}
-            </ThemedView>
-          }
-          renderItem={({ item }) => <DeckCard deck={item} />}
-        />
+        <>
+          <ThemedView style={styles.pinned}>
+            <DeckSearchBar value={query} onChange={setQuery} />
+          </ThemedView>
+          <FlatList
+            ref={listRef}
+            style={styles.listFlex}
+            data={visibleDecks}
+            keyExtractor={(item) => item.id}
+            keyboardShouldPersistTaps="handled"
+            contentContainerStyle={styles.list}
+            scrollEventThrottle={16}
+            onScroll={onListScroll}
+            refreshControl={
+              <RefreshControl
+                refreshing={refreshing}
+                onRefresh={() => void loadDecks('refresh')}
+                tintColor={theme.text}
+                colors={[theme.text]}
+              />
+            }
+            ListHeaderComponent={listHeader ?? undefined}
+            ListEmptyComponent={
+              <ThemedView style={styles.empty}>
+                {searching ? (
+                  <ThemedText type="smallBold">Ningún mazo coincide con la búsqueda</ThemedText>
+                ) : (
+                  <>
+                    <ThemedText type="smallBold">No hay mazos</ThemedText>
+                    <ThemedText themeColor="textSecondary">Cuando haya mazos, aparecerán aquí.</ThemedText>
+                  </>
+                )}
+              </ThemedView>
+            }
+            renderItem={({ item }) => <DeckCard deck={item} />}
+          />
+          {showScrollTop ? <ScrollToTopButton onPress={scrollToTop} /> : null}
+        </>
       )}
     </ThemedView>
   );
@@ -163,11 +195,23 @@ const styles = StyleSheet.create({
   screen: {
     flex: 1,
   },
+  pinned: {
+    width: '100%',
+    maxWidth: MaxContentWidth,
+    alignSelf: 'center',
+    paddingHorizontal: Spacing.three,
+    paddingTop: Spacing.three,
+    paddingBottom: Spacing.two,
+  },
+  listFlex: {
+    flex: 1,
+  },
   list: {
     width: '100%',
     maxWidth: MaxContentWidth,
     alignSelf: 'center',
-    padding: Spacing.three,
+    paddingHorizontal: Spacing.three,
+    paddingBottom: Spacing.three,
     gap: Spacing.three,
     flexGrow: 1,
   },
