@@ -21,7 +21,7 @@ import { MaxContentWidth, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { listDecks } from '@/services/decks';
 import type { Deck } from '@/types/api';
-import { normalizeSearchText, searchDecks } from '@/utils/decks';
+import { normalizeSearchText, searchDecks, studyDeckHref } from '@/utils/decks';
 import { requestErrorMessage } from '@/utils/request-feedback';
 
 function resultLabel(count: number): string {
@@ -182,7 +182,12 @@ export default function DecksScreen() {
                 )}
               </ThemedView>
             }
-            renderItem={({ item }) => <DeckCard deck={item} />}
+            renderItem={({ item }) => (
+              <DeckCard
+                deck={item}
+                href={mode === 'study' ? studyDeckHref(item) : undefined}
+              />
+            )}
           />
           {showScrollTop ? <ScrollToTopButton onPress={scrollToTop} /> : null}
         </>

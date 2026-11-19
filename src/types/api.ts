@@ -14,6 +14,7 @@ export interface Deck {
   createdAt?: string;
   updatedAt?: string;
   lastTimeStudiedAt?: string;
+  cardCount?: number;
 }
 
 export interface Flashcard {

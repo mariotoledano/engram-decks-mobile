@@ -1,4 +1,4 @@
-import Svg, { Circle, Path } from 'react-native-svg';
+import Svg, { Circle, Path, Rect } from 'react-native-svg';
 
 export interface IconProps {
   color: string;
@@ -6,6 +6,30 @@ export interface IconProps {
 }
 
 const STROKE = 1.75;
+
+export function DeckIcon({ color, size = 20 }: IconProps) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <Path
+        d="M9.2 7.2V5.4c0-1 .8-1.8 1.8-1.8h7.4c1 0 1.8.8 1.8 1.8v8.4c0 1-.8 1.8-1.8 1.8h-1.5"
+        stroke={color}
+        strokeWidth={STROKE}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <Rect
+        x="3.8"
+        y="7.4"
+        width="12.8"
+        height="13"
+        rx="1.8"
+        stroke={color}
+        strokeWidth={STROKE}
+        strokeLinejoin="round"
+      />
+    </Svg>
+  );
+}
 
 export function OpenBookIcon({ color, size = 20 }: IconProps) {
   return (
@@ -22,11 +46,40 @@ export function OpenBookIcon({ color, size = 20 }: IconProps) {
   );
 }
 
+export function TagIcon({ color, size = 20 }: IconProps) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <Path
+        d="M9.2 4.8h8.2c1 0 1.8.8 1.8 1.8v10.8c0 1-.8 1.8-1.8 1.8H9.2L4.2 12 9.2 4.8Z"
+        stroke={color}
+        strokeWidth={STROKE}
+        strokeLinejoin="round"
+        strokeLinecap="round"
+      />
+      <Circle cx="10.6" cy="12" r="1.15" stroke={color} strokeWidth={STROKE} />
+    </Svg>
+  );
+}
+
 export function SearchIcon({ color, size = 20 }: IconProps) {
   return (
     <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
       <Circle cx="10.7" cy="10.7" r="5.45" stroke={color} strokeWidth={STROKE} />
       <Path d="M14.9 14.9 19.35 19.35" stroke={color} strokeWidth={STROKE} strokeLinecap="round" />
+    </Svg>
+  );
+}
+
+export function ArrowLeftIcon({ color, size = 20 }: IconProps) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <Path
+        d="M14.75 5.75 8.25 12l6.5 6.25"
+        stroke={color}
+        strokeWidth={STROKE}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
     </Svg>
   );
 }

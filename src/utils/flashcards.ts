@@ -61,6 +61,17 @@ function matchRank(card: Flashcard, tokens: string[]): number | null {
   return rank;
 }
 
+export function shuffleFlashcards(cards: Flashcard[]): Flashcard[] {
+  const next = [...cards];
+  for (let index = next.length - 1; index > 0; index -= 1) {
+    const swap = Math.floor(Math.random() * (index + 1));
+    const current = next[index];
+    next[index] = next[swap];
+    next[swap] = current;
+  }
+  return next;
+}
+
 export function searchFlashcards(cards: Flashcard[], query: string): Flashcard[] {
   const tokens = normalizeSearchText(query).split(' ').filter((token) => token.length > 0);
   if (tokens.length === 0) {

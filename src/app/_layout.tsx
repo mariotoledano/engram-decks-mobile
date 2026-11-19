@@ -5,6 +5,7 @@ import * as SplashScreen from 'expo-splash-screen';
 import { useEffect } from 'react';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
+import { HomeBackLink } from '@/components/home-back-link';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useTheme } from '@/hooks/use-theme';
 
@@ -29,9 +30,33 @@ export default function RootLayout() {
             headerShadowVisible: false,
             contentStyle: { backgroundColor: theme.background },
           }}>
-          <Stack.Screen name="index" options={{ title: 'Inicio' }} />
-          <Stack.Screen name="decks" options={{ title: 'Mazos' }} />
-          <Stack.Screen name="cards" options={{ title: 'Tarjetas' }} />
+          <Stack.Screen name="index" options={{ title: 'Engram Decks' }} />
+          <Stack.Screen
+            name="decks"
+            options={{
+              title: 'Mazos',
+              headerBackVisible: false,
+              headerLeft: () => <HomeBackLink />,
+            }}
+          />
+          <Stack.Screen
+            name="cards"
+            options={{
+              title: 'Tarjetas',
+              headerBackVisible: false,
+              headerLeft: () => <HomeBackLink />,
+            }}
+          />
+          <Stack.Screen
+            name="free-study"
+            options={{
+              title: 'Estudio libre',
+              headerBackVisible: false,
+              headerLeft: () => <HomeBackLink />,
+            }}
+          />
+          <Stack.Screen name="study/free" options={{ title: '' }} />
+          <Stack.Screen name="study/[deckId]" options={{ title: '' }} />
         </Stack>
       </ThemeProvider>
     </GestureHandlerRootView>

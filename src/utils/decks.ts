@@ -1,4 +1,13 @@
+import type { Href } from 'expo-router';
+
 import type { Deck } from '@/types/api';
+
+export function studyDeckHref(deck: Pick<Deck, 'id' | 'name'>): Href {
+  return {
+    pathname: '/study/[deckId]',
+    params: { deckId: deck.id, name: deck.name },
+  };
+}
 
 const TITLE_RANK = 0;
 const TAG_RANK = 1;

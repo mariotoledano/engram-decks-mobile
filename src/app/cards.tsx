@@ -1,5 +1,5 @@
-import { useFocusEffect } from 'expo-router';
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useFocusEffect, useNavigation } from 'expo-router';
+import { useCallback, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import {
   FlatList,
   Pressable,
@@ -10,6 +10,7 @@ import {
   type NativeSyntheticEvent,
 } from 'react-native';
 
+import { CardModeSwitch, type CardMode } from '@/components/card-mode-switch';
 import { ErrorView } from '@/components/error-view';
 import { FlashcardRow } from '@/components/flashcard-row';
 import { LoadingView } from '@/components/loading-view';
@@ -67,16 +68,25 @@ function CardSearchBar({ value, onChange }: CardSearchBarProps) {
 
 export default function CardsScreen() {
   const theme = useTheme();
+  const navigation = useNavigation();
   const listRef = useRef<FlatList<Flashcard>>(null);
   const cardsRef = useRef<Flashcard[] | null>(null);
   const [cards, setCards] = useState<Flashcard[] | null>(null);
   const [showScrollTop, setShowScrollTop] = useState(false);
   const [query, setQuery] = useState('');
+  const [mode, setMode] = useState<CardMode>('search');
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const searching = normalizeSearchText(query).length > 0;
   const visibleCards = useMemo(() => (cards === null ? [] : searchFlashcards(cards, query)), [cards, query]);
+
+  useLayoutEffect(() => {
+    navigation.setOptions({
+      headerRight: () => <CardModeSwitch value={mode} onChange={setMode} />,
+      headerRightContainerStyle: { paddingRight: Spacing.three },
+    });
+  }, [navigation, mode]);
 
   const loadCards = useCallback(async (loadMode: 'initial' | 'refresh') => {
     if (loadMode === 'initial') {
