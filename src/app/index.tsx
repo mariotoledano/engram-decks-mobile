@@ -1,4 +1,4 @@
-import { router, useFocusEffect } from 'expo-router';
+import { router, useFocusEffect, type Href } from 'expo-router';
 import { useCallback, useRef, useState } from 'react';
 import { FlatList, Pressable, RefreshControl, StyleSheet, View } from 'react-native';
 
@@ -103,7 +103,7 @@ export default function HomeScreen() {
           ListHeaderComponent={
             <ThemedView style={styles.header}>
               <PrimaryButton label="Mazos" onPress={() => router.push('/decks')} />
-              <PrimaryButton label="Tarjetas" onPress={() => router.push('/cards')} />
+              <PrimaryButton label="Tarjetas" onPress={() => router.push('/cards' as Href)} />
               <PrimaryButton label="Estudio libre" onPress={openFreeStudy} />
               <ThemedText type="smallBold">Recientes</ThemedText>
               {error ? (

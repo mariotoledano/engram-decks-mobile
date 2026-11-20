@@ -3,6 +3,7 @@ import { useCallback, useEffect, useLayoutEffect, useState } from 'react';
 import { StyleSheet } from 'react-native';
 
 import { ErrorView } from '@/components/error-view';
+import { HomeBackLink } from '@/components/home-back-link';
 import { LoadingView } from '@/components/loading-view';
 import { StudyModeSwitch, type StudyMode } from '@/components/study-mode-switch';
 import { StudySession } from '@/components/study-session';
@@ -23,6 +24,8 @@ export default function FreeStudySessionScreen() {
   useLayoutEffect(() => {
     navigation.setOptions({
       title: 'Estudio libre',
+      headerBackVisible: false,
+      headerLeft: () => <HomeBackLink />,
       headerRight: () => <StudyModeSwitch value={mode} onChange={setMode} />,
       headerRightContainerStyle: { paddingRight: Spacing.three },
     });

@@ -3,6 +3,8 @@ import { StyleSheet, View } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, { runOnJS, useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
 
+import { IconButton } from '@/components/icon-button';
+import { EditSheetIcon, SearchIcon } from '@/components/icons';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Spacing } from '@/constants/theme';
@@ -17,9 +19,11 @@ type Face = 'front' | 'back';
 
 interface FlashcardRowProps {
   card: Flashcard;
+  onInspect: () => void;
+  onEdit: () => void;
 }
 
-export function FlashcardRow({ card }: FlashcardRowProps) {
+export function FlashcardRow({ card, onInspect, onEdit }: FlashcardRowProps) {
   const theme = useTheme();
   const tags = card.tags ?? [];
   const rotation = useSharedValue(0);
@@ -84,8 +88,9 @@ export function FlashcardRow({ card }: FlashcardRowProps) {
   });
 
   return (
-    <ThemedView type="backgroundElement" style={styles.card}>
-      <GestureDetector gesture={gesture}>
+    <View style={styles.row}>
+      <ThemedView type="backgroundElement" style={styles.card}>
+        <GestureDetector gesture={gesture}>
         <View
           accessible
           accessibilityRole="button"
@@ -115,14 +120,29 @@ export function FlashcardRow({ card }: FlashcardRowProps) {
             <View style={[styles.stripe, { backgroundColor: theme.accent }]} />
           </Animated.View>
         </View>
-      </GestureDetector>
-    </ThemedView>
+        </GestureDetector>
+      </ThemedView>
+      <View style={styles.actions}>
+        <IconButton icon={SearchIcon} accessibilityLabel="Ver tarjeta" onPress={onInspect} />
+        <IconButton icon={EditSheetIcon} accessibilityLabel="Editar tarjeta" onPress={onEdit} />
+      </View>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
+  row: {
+    flexDirection: 'row',
+    alignItems: 'stretch',
+    gap: Spacing.two,
+  },
+  actions: {
+    justifyContent: 'center',
+    gap: Spacing.two,
+  },
   card: {
-    width: '100%',
+    flex: 1,
+    minWidth: 0,
     alignSelf: 'stretch',
     overflow: 'hidden',
     borderRadius: Spacing.three,

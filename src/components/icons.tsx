@@ -84,6 +84,20 @@ export function ArrowLeftIcon({ color, size = 20 }: IconProps) {
   );
 }
 
+export function ChevronDownIcon({ color, size = 20 }: IconProps) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <Path
+        d="M6.25 9.25 12 15l5.75-5.75"
+        stroke={color}
+        strokeWidth={STROKE}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </Svg>
+  );
+}
+
 export function ArrowUpIcon({ color, size = 20 }: IconProps) {
   return (
     <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">

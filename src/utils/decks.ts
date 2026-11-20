@@ -78,6 +78,57 @@ function matchRank(deck: Deck, tokens: string[]): number | null {
   return rank;
 }
 
+function uniqueDecks(decks: Deck[]): Deck[] {
+  const seen = new Set<string>();
+  const unique: Deck[] = [];
+
+  for (const deck of decks) {
+    if (deck.id.length === 0 || seen.has(deck.id)) {
+      continue;
+    }
+    seen.add(deck.id);
+    unique.push(deck);
+  }
+
+  return unique;
+}
+
+function searchTokens(query: string): string[] {
+  return normalizeSearchText(query)
+    .split(' ')
+    .filter((token) => token.length > 0);
+}
+
+function byDeckName(left: Deck, right: Deck): number {
+  return left.name.localeCompare(right.name, 'es');
+}
+
+export function filterDecksByName(decks: Deck[], query: string): Deck[] {
+  const unique = uniqueDecks(decks);
+  const tokens = searchTokens(query);
+  const matched =
+    tokens.length === 0
+      ? unique
+      : unique.filter((deck) => tokens.every((token) => normalizeSearchText(deck.name).includes(token)));
+
+  return matched.sort(byDeckName);
+}
+
+export function filterDecksByNameAndDescription(decks: Deck[], query: string): Deck[] {
+  const unique = uniqueDecks(decks);
+  const tokens = searchTokens(query);
+  const matched =
+    tokens.length === 0
+      ? unique
+      : unique.filter((deck) => {
+          const name = normalizeSearchText(deck.name);
+          const description = normalizeSearchText(deck.description ?? '');
+          return tokens.every((token) => name.includes(token) || description.includes(token));
+        });
+
+  return matched.sort(byDeckName);
+}
+
 export function searchDecks(decks: Deck[], query: string): Deck[] {
   const tokens = normalizeSearchText(query).split(' ').filter((token) => token.length > 0);
   if (tokens.length === 0) {

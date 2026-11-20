@@ -5,6 +5,7 @@ import * as SplashScreen from 'expo-splash-screen';
 import { useEffect } from 'react';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
+import { BackLink } from '@/components/back-link';
 import { HomeBackLink } from '@/components/home-back-link';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useTheme } from '@/hooks/use-theme';
@@ -40,11 +41,27 @@ export default function RootLayout() {
             }}
           />
           <Stack.Screen
-            name="cards"
+            name="cards/index"
             options={{
               title: 'Tarjetas',
               headerBackVisible: false,
               headerLeft: () => <HomeBackLink />,
+            }}
+          />
+          <Stack.Screen
+            name="cards/[cardId]/index"
+            options={{
+              title: '',
+              headerBackVisible: false,
+              headerLeft: () => <BackLink />,
+            }}
+          />
+          <Stack.Screen
+            name="cards/[cardId]/edit"
+            options={{
+              title: 'Edición de Tarjeta',
+              headerBackVisible: false,
+              headerLeft: () => <BackLink />,
             }}
           />
           <Stack.Screen

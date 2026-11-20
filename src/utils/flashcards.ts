@@ -1,9 +1,8 @@
 import type { Flashcard } from '@/types/api';
 import { normalizeSearchText } from '@/utils/decks';
 
-const TAG_RANK = 0;
-const FRONT_RANK = 1;
-const BACK_RANK = 2;
+const FRONT_RANK = 0;
+const BACK_RANK = 1;
 
 function recentAt(card: Flashcard): number | null {
   const raw = card.updatedAt ?? card.createdAt;
@@ -29,10 +28,11 @@ export function compareFlashcardsByRecent(left: Flashcard, right: Flashcard): nu
   return left.id.localeCompare(right.id);
 }
 
-function tokenRank(token: string, tags: string[], front: string, back: string): number | null {
-  if (tags.some((tag) => tag.includes(token))) {
-    return TAG_RANK;
-  }
+export function tagKey(tag: string): string {
+  return tag.trim().toLowerCase();
+}
+
+function textRank(token: string, front: string, back: string): number | null {
   if (front.includes(token)) {
     return FRONT_RANK;
   }
@@ -43,13 +43,12 @@ function tokenRank(token: string, tags: string[], front: string, back: string): 
 }
 
 function matchRank(card: Flashcard, tokens: string[]): number | null {
-  const tags = (card.tags ?? []).map((tag) => normalizeSearchText(tag));
   const front = normalizeSearchText(card.front);
   const back = normalizeSearchText(card.back);
-  let rank = TAG_RANK;
+  let rank = FRONT_RANK;
 
   for (const token of tokens) {
-    const fieldRank = tokenRank(token, tags, front, back);
+    const fieldRank = textRank(token, front, back);
     if (fieldRank === null) {
       return null;
     }
@@ -59,6 +58,49 @@ function matchRank(card: Flashcard, tokens: string[]): number | null {
   }
 
   return rank;
+}
+
+export function filterTagNames(tags: string[], query: string): string[] {
+  const seen = new Set<string>();
+  const unique: string[] = [];
+
+  for (const tag of tags) {
+    const trimmed = tag.trim();
+    const key = tagKey(trimmed);
+    if (key.length === 0 || seen.has(key)) {
+      continue;
+    }
+    seen.add(key);
+    unique.push(trimmed);
+  }
+
+  const tokens = normalizeSearchText(query)
+    .split(' ')
+    .filter((token) => token.length > 0);
+  const matched =
+    tokens.length === 0
+      ? unique
+      : unique.filter((tag) => tokens.every((token) => normalizeSearchText(tag).includes(token)));
+
+  return matched.sort((left, right) => left.localeCompare(right, 'es'));
+}
+
+export function filterFlashcardsByTags(cards: Flashcard[], tags: string[]): Flashcard[] {
+  const wanted = new Set(tags.map(tagKey).filter((key) => key.length > 0));
+  if (wanted.size === 0) {
+    return cards;
+  }
+
+  return cards.filter((card) => (card.tags ?? []).some((tag) => wanted.has(tagKey(tag))));
+}
+
+export function filterFlashcardsByDecks(cards: Flashcard[], deckIds: string[]): Flashcard[] {
+  const wanted = new Set(deckIds.filter((id) => id.length > 0));
+  if (wanted.size === 0) {
+    return cards;
+  }
+
+  return cards.filter((card) => (card.deckIds ?? []).some((id) => wanted.has(id)));
 }
 
 export function shuffleFlashcards(cards: Flashcard[]): Flashcard[] {

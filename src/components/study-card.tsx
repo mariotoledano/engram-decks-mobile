@@ -61,7 +61,7 @@ export function StudyCard({ card, canGoPrevious, canGoNext, onPrevious, onNext }
         }
       })
       .onTouchesMove((event, state) => {
-        if (committed.value) {
+        if (committed.value || (!canGoPrevious && !canGoNext)) {
           return;
         }
         const touch = event.allTouches[0];
@@ -79,7 +79,7 @@ export function StudyCard({ card, canGoPrevious, canGoNext, onPrevious, onNext }
         }
       })
       .onUpdate((event) => {
-        if (committed.value) {
+        if (committed.value || (!canGoPrevious && !canGoNext)) {
           return;
         }
         translateX.value = event.translationX;
@@ -160,10 +160,14 @@ export function StudyCard({ card, canGoPrevious, canGoNext, onPrevious, onNext }
     };
   });
 
-  const hint =
-    face === 'front'
-      ? 'Toca para ver el reverso. Desliza a la izquierda para la siguiente y a la derecha para la anterior.'
-      : 'Toca para ver el anverso. Desliza a la izquierda para la siguiente y a la derecha para la anterior.';
+  const navigable = canGoPrevious || canGoNext;
+  const hint = navigable
+    ? face === 'front'
+      ? 'Toca la carta para ver el reverso. Toca el borde izquierdo o desliza a la derecha para la anterior, y el borde derecho o desliza a la izquierda para la siguiente.'
+      : 'Toca la carta para ver el anverso. Toca el borde izquierdo o desliza a la derecha para la anterior, y el borde derecho o desliza a la izquierda para la siguiente.'
+    : face === 'front'
+      ? 'Toca la carta para ver el reverso.'
+      : 'Toca la carta para ver el anverso.';
 
   return (
     <GestureDetector gesture={gesture}>

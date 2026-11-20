@@ -1,6 +1,6 @@
 import { router } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { DeckIcon } from '@/components/icons';
@@ -72,7 +72,14 @@ export function StudySession({ cards, emptyMessage }: StudySessionProps) {
         </View>
       ) : card ? (
         <>
-          <View style={styles.stage}>
+          <View style={styles.playStage}>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Tarjeta anterior"
+              disabled={index === 0}
+              onPress={goPrevious}
+              style={styles.edge}
+            />
             <StudyCard
               key={`${round}-${card.id}`}
               card={card}
@@ -80,6 +87,13 @@ export function StudySession({ cards, emptyMessage }: StudySessionProps) {
               canGoNext={index < total}
               onPrevious={goPrevious}
               onNext={goNext}
+            />
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Tarjeta siguiente"
+              disabled={index >= total}
+              onPress={goNext}
+              style={styles.edge}
             />
           </View>
           <View
@@ -113,6 +127,19 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.three,
     paddingTop: Spacing.four,
     paddingBottom: Spacing.three,
+  },
+  playStage: {
+    flex: 1,
+    width: '100%',
+    maxWidth: MaxContentWidth,
+    alignSelf: 'center',
+    flexDirection: 'row',
+    alignItems: 'stretch',
+    paddingTop: Spacing.four,
+    paddingBottom: Spacing.three,
+  },
+  edge: {
+    width: 44,
   },
   countRow: {
     width: '100%',

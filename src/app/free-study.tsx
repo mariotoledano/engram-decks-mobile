@@ -1,6 +1,6 @@
 import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useMemo, useRef, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
+import { Platform, Pressable, ScrollView, StyleSheet, TextInput, View, type ViewStyle } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { CardCountSlider } from '@/components/card-count-slider';
@@ -135,7 +135,7 @@ export default function FreeStudyScreen() {
         return;
       }
       await saveFreeStudyDeck(drawn);
-      router.push('/study/free');
+      router.replace('/study/free');
     } catch (requestError) {
       setNotice(requestErrorMessage(requestError));
     } finally {
@@ -175,8 +175,9 @@ export default function FreeStudyScreen() {
             ) : null}
             <ThemedView type="backgroundElement" style={[styles.box, { borderColor: theme.line }]}>
               <ScrollView
-                style={styles.boxScroll}
+                style={[styles.boxScroll, Platform.OS === 'web' ? webHiddenScrollbar : null]}
                 contentContainerStyle={styles.chips}
+                showsVerticalScrollIndicator={false}
                 keyboardShouldPersistTaps="handled">
                 {visible.length === 0 ? (
                   <ThemedText themeColor="textSecondary">
@@ -200,8 +201,10 @@ export default function FreeStudyScreen() {
                             borderColor: marked ? theme.accent : theme.line,
                           },
                         ]}>
-                        <Icon color={marked ? theme.accent : theme.textSecondary} size={14} />
-                        <ThemedText type="small" style={styles.chipLabel}>
+                        <View style={styles.chipIcon}>
+                          <Icon color={marked ? theme.accent : theme.textSecondary} size={16} />
+                        </View>
+                        <ThemedText type="small" numberOfLines={1} ellipsizeMode="tail" style={styles.chipLabel}>
                           {source.label}
                         </ThemedText>
                       </Pressable>
@@ -229,6 +232,8 @@ export default function FreeStudyScreen() {
     </ThemedView>
   );
 }
+
+const webHiddenScrollbar = { scrollbarWidth: 'none' } as ViewStyle;
 
 const styles = StyleSheet.create({
   screen: {
@@ -306,7 +311,15 @@ const styles = StyleSheet.create({
     paddingLeft: Spacing.two,
     paddingRight: Spacing.three,
   },
+  chipIcon: {
+    width: 16,
+    height: 16,
+    flexShrink: 0,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   chipLabel: {
+    maxWidth: 200,
     flexShrink: 1,
   },
   footer: {
