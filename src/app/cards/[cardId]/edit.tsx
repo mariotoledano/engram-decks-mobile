@@ -4,12 +4,12 @@ import { ScrollView, StyleSheet, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { BackLink } from '@/components/back-link';
+import { AddChipButton, ChipPicker } from '@/components/chip-picker';
 import { ErrorView } from '@/components/error-view';
-import { FilterChipBox, type FilterChip } from '@/components/filter-chip-box';
+import { FilterChipButton, type FilterChip } from '@/components/filter-chip-box';
 import { DeckIcon, TagIcon } from '@/components/icons';
 import { LoadingView } from '@/components/loading-view';
 import { PrimaryButton } from '@/components/primary-button';
-import { SearchField } from '@/components/search-field';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { MaxContentWidth, Spacing } from '@/constants/theme';
@@ -22,12 +22,17 @@ import { filterDecksByNameAndDescription } from '@/utils/decks';
 import { filterTagNames, tagKey } from '@/utils/flashcards';
 import { requestErrorMessage } from '@/utils/request-feedback';
 
+const MAX_TAGS = 20;
+const MISSING_DECK_LABEL = 'Mazo no disponible';
+
 function routeParam(value: string | string[] | undefined): string {
   if (Array.isArray(value)) {
     return value[0] ?? '';
   }
   return value ?? '';
 }
+
+type Picker = 'tags' | 'decks';
 
 export default function EditCardScreen() {
   const theme = useTheme();
@@ -38,10 +43,14 @@ export default function EditCardScreen() {
   const formReady = useRef(false);
   const [tags, setTags] = useState<string[] | null>(null);
   const [decks, setDecks] = useState<Deck[] | null>(null);
+  const [rowTags, setRowTags] = useState<string[]>([]);
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
+  const [rowDeckIds, setRowDeckIds] = useState<string[]>([]);
   const [selectedDeckIds, setSelectedDeckIds] = useState<string[]>([]);
   const [tagQuery, setTagQuery] = useState('');
   const [deckQuery, setDeckQuery] = useState('');
+  const [picker, setPicker] = useState<Picker | null>(null);
+  const [tagNotice, setTagNotice] = useState<string | null>(null);
   const [front, setFront] = useState('');
   const [back, setBack] = useState('');
   const [loading, setLoading] = useState(true);
@@ -69,8 +78,10 @@ export default function EditCardScreen() {
     const rest = matchingDecks.filter((deck) => !selectedDeckIdSet.has(deck.id));
     return [...selected, ...rest];
   }, [decks, matchingDecks, selectedDeckIdSet, selectedDeckIds]);
-  const tagEmptyLabel = tags !== null && tags.length === 0 ? 'No hay etiquetas' : 'Nada coincide con la búsqueda';
-  const deckEmptyLabel = decks !== null && decks.length === 0 ? 'No hay mazos' : 'Nada coincide con la búsqueda';
+  const tagEmptyLabel =
+    tags === null ? 'Cargando etiquetas…' : tags.length === 0 ? 'No hay etiquetas' : 'Nada coincide con la búsqueda';
+  const deckEmptyLabel =
+    decks === null ? 'Cargando mazos…' : decks.length === 0 ? 'No hay mazos' : 'Nada coincide con la búsqueda';
   const tagChips = useMemo<FilterChip[]>(
     () =>
       visibleTags.map((tag) => ({
@@ -90,6 +101,17 @@ export default function EditCardScreen() {
         accessibilityLabel: `Mazo ${deck.name}`,
       })),
     [selectedDeckIdSet, visibleDecks],
+  );
+  const rowDecks = useMemo(
+    () =>
+      rowDeckIds.flatMap((id) => {
+        if (decks === null) {
+          return [];
+        }
+        const deck = decks.find((item) => item.id === id);
+        return [{ id, name: deck?.name ?? MISSING_DECK_LABEL }];
+      }),
+    [decks, rowDeckIds],
   );
 
   useLayoutEffect(() => {
@@ -111,10 +133,14 @@ export default function EditCardScreen() {
       if (cardResult.status === 'fulfilled') {
         if (!formReady.current) {
           const card = cardResult.value;
+          const cardTags = card.tags ?? [];
+          const cardDeckIds = card.deckIds ?? [];
           setFront(card.front);
           setBack(card.back);
-          setSelectedTags(card.tags ?? []);
-          setSelectedDeckIds(card.deckIds ?? []);
+          setRowTags(cardTags);
+          setSelectedTags(cardTags);
+          setRowDeckIds(cardDeckIds);
+          setSelectedDeckIds(cardDeckIds);
           formReady.current = true;
         }
         setError(null);
@@ -142,30 +168,53 @@ export default function EditCardScreen() {
     void loadCard();
   }, [loadCard]);
 
+  const openPicker = useCallback((next: Picker) => {
+    if (next === 'tags') {
+      setTagQuery('');
+      setTagNotice(null);
+    } else {
+      setDeckQuery('');
+    }
+    setPicker(next);
+  }, []);
+
   const toggleTag = useCallback(
     (key: string) => {
-      const tag = visibleTags.find((item) => tagKey(item) === key);
+      if (saving) {
+        return;
+      }
+      const tag = rowTags.find((item) => tagKey(item) === key) ?? visibleTags.find((item) => tagKey(item) === key);
       if (!tag) {
         return;
       }
-      setSelectedTags((current) => {
-        if (current.some((item) => tagKey(item) === key)) {
-          return current.filter((item) => tagKey(item) !== key);
-        }
-        return [tag, ...current];
-      });
+      const alreadySelected = selectedTags.some((item) => tagKey(item) === key);
+      if (!alreadySelected && selectedTags.length >= MAX_TAGS) {
+        setTagNotice('Puedes asignar como máximo 20 etiquetas.');
+        return;
+      }
+      setTagNotice(null);
+      setRowTags((current) => (current.some((item) => tagKey(item) === key) ? current : [...current, tag]));
+      setSelectedTags((current) =>
+        alreadySelected ? current.filter((item) => tagKey(item) !== key) : [...current, tag],
+      );
     },
-    [visibleTags],
+    [rowTags, saving, selectedTags, visibleTags],
   );
 
   const toggleDeck = useCallback(
     (id: string) => {
-      if (!visibleDecks.some((deck) => deck.id === id)) {
+      if (saving) {
         return;
       }
-      setSelectedDeckIds((current) => (current.includes(id) ? current.filter((item) => item !== id) : [id, ...current]));
+      const known = rowDeckIds.includes(id) || visibleDecks.some((deck) => deck.id === id);
+      if (!known) {
+        return;
+      }
+      const alreadySelected = selectedDeckIds.includes(id);
+      setRowDeckIds((current) => (current.includes(id) ? current : [...current, id]));
+      setSelectedDeckIds((current) => (alreadySelected ? current.filter((item) => item !== id) : [...current, id]));
     },
-    [visibleDecks],
+    [rowDeckIds, saving, selectedDeckIds, visibleDecks],
   );
 
   const save = useCallback(async () => {
@@ -205,46 +254,11 @@ export default function EditCardScreen() {
           contentContainerStyle={[styles.content, { paddingBottom: Math.max(insets.bottom, Spacing.three) }]}
           keyboardShouldPersistTaps="handled">
           <View style={styles.section}>
-            <ThemedText type="smallBold">Etiquetas</ThemedText>
-            <SearchField
-              value={tagQuery}
-              onChange={setTagQuery}
-              placeholder="Buscar etiquetas"
-              accessibilityLabel="Buscar etiquetas"
-              clearLabel="Borrar búsqueda de etiquetas"
-            />
-            <FilterChipBox
-              chips={tagChips}
-              Icon={TagIcon}
-              emptyLabel={tagEmptyLabel}
-              error={tags === null ? tagsError : null}
-              onPress={toggleTag}
-              onRetry={() => void loadCard()}
-            />
-          </View>
-          <View style={styles.section}>
-            <ThemedText type="smallBold">Mazos</ThemedText>
-            <SearchField
-              value={deckQuery}
-              onChange={setDeckQuery}
-              placeholder="Buscar mazos"
-              accessibilityLabel="Buscar mazos"
-              clearLabel="Borrar búsqueda de mazos"
-            />
-            <FilterChipBox
-              chips={deckChips}
-              Icon={DeckIcon}
-              emptyLabel={deckEmptyLabel}
-              error={decks === null ? decksError : null}
-              onPress={toggleDeck}
-              onRetry={() => void loadCard()}
-            />
-          </View>
-          <View style={styles.section}>
             <ThemedText type="smallBold">Anverso</ThemedText>
             <TextInput
               value={front}
               onChangeText={setFront}
+              editable={!saving}
               multiline
               textAlignVertical="top"
               accessibilityLabel="Anverso"
@@ -256,11 +270,50 @@ export default function EditCardScreen() {
             <TextInput
               value={back}
               onChangeText={setBack}
+              editable={!saving}
               multiline
               textAlignVertical="top"
               accessibilityLabel="Reverso"
               style={[styles.editor, { color: theme.text, borderColor: theme.line, backgroundColor: theme.backgroundElement }]}
             />
+          </View>
+          <View style={styles.section}>
+            <ThemedText type="smallBold">Etiquetas</ThemedText>
+            <View style={styles.chips}>
+              {rowTags.map((tag) => (
+                <FilterChipButton
+                  key={tagKey(tag)}
+                  chip={{
+                    key: tagKey(tag),
+                    label: tag,
+                    selected: selectedTagKeys.has(tagKey(tag)),
+                    accessibilityLabel: `Etiqueta ${tag}`,
+                  }}
+                  Icon={TagIcon}
+                  onPress={toggleTag}
+                />
+              ))}
+              <AddChipButton label="Añadir etiquetas" disabled={saving} onPress={() => openPicker('tags')} />
+            </View>
+          </View>
+          <View style={styles.section}>
+            <ThemedText type="smallBold">Mazos</ThemedText>
+            <View style={styles.chips}>
+              {rowDecks.map((deck) => (
+                <FilterChipButton
+                  key={deck.id}
+                  chip={{
+                    key: deck.id,
+                    label: deck.name,
+                    selected: selectedDeckIdSet.has(deck.id),
+                    accessibilityLabel: `Mazo ${deck.name}`,
+                  }}
+                  Icon={DeckIcon}
+                  onPress={toggleDeck}
+                />
+              ))}
+              <AddChipButton label="Añadir mazos" disabled={saving} onPress={() => openPicker('decks')} />
+            </View>
           </View>
           {notice ? (
             <ThemedText themeColor="danger" style={styles.notice}>
@@ -271,6 +324,39 @@ export default function EditCardScreen() {
           <PrimaryButton label="Volver sin guardar" variant="secondary" disabled={saving} onPress={() => router.back()} />
         </ScrollView>
       )}
+      <ChipPicker
+        visible={picker === 'tags'}
+        closeLabel="Cerrar etiquetas"
+        onClose={() => setPicker(null)}
+        query={tagQuery}
+        onQueryChange={setTagQuery}
+        placeholder="Buscar etiquetas"
+        searchLabel="Buscar etiquetas"
+        clearLabel="Borrar búsqueda de etiquetas"
+        chips={tagChips}
+        Icon={TagIcon}
+        emptyLabel={tagEmptyLabel}
+        error={tags === null ? tagsError : null}
+        onPress={toggleTag}
+        onRetry={() => void loadCard()}
+        notice={tagNotice}
+      />
+      <ChipPicker
+        visible={picker === 'decks'}
+        closeLabel="Cerrar mazos"
+        onClose={() => setPicker(null)}
+        query={deckQuery}
+        onQueryChange={setDeckQuery}
+        placeholder="Buscar mazos"
+        searchLabel="Buscar mazos"
+        clearLabel="Borrar búsqueda de mazos"
+        chips={deckChips}
+        Icon={DeckIcon}
+        emptyLabel={deckEmptyLabel}
+        error={decks === null ? decksError : null}
+        onPress={toggleDeck}
+        onRetry={() => void loadCard()}
+      />
     </ThemedView>
   );
 }
@@ -291,6 +377,12 @@ const styles = StyleSheet.create({
     paddingTop: Spacing.three,
   },
   section: {
+    gap: Spacing.two,
+  },
+  chips: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    alignItems: 'center',
     gap: Spacing.two,
   },
   editor: {

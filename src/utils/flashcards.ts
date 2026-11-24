@@ -86,12 +86,15 @@ export function filterTagNames(tags: string[], query: string): string[] {
 }
 
 export function filterFlashcardsByTags(cards: Flashcard[], tags: string[]): Flashcard[] {
-  const wanted = new Set(tags.map(tagKey).filter((key) => key.length > 0));
-  if (wanted.size === 0) {
+  const wanted = [...new Set(tags.map(tagKey).filter((key) => key.length > 0))];
+  if (wanted.length === 0) {
     return cards;
   }
 
-  return cards.filter((card) => (card.tags ?? []).some((tag) => wanted.has(tagKey(tag))));
+  return cards.filter((card) => {
+    const present = new Set((card.tags ?? []).map(tagKey));
+    return wanted.every((key) => present.has(key));
+  });
 }
 
 export function filterFlashcardsByDecks(cards: Flashcard[], deckIds: string[]): Flashcard[] {
@@ -101,6 +104,14 @@ export function filterFlashcardsByDecks(cards: Flashcard[], deckIds: string[]): 
   }
 
   return cards.filter((card) => (card.deckIds ?? []).some((id) => wanted.has(id)));
+}
+
+export function filterFlashcardsWithoutTags(cards: Flashcard[]): Flashcard[] {
+  return cards.filter((card) => !(card.tags ?? []).some((tag) => tagKey(tag).length > 0));
+}
+
+export function filterFlashcardsWithoutDecks(cards: Flashcard[]): Flashcard[] {
+  return cards.filter((card) => !(card.deckIds ?? []).some((id) => id.length > 0));
 }
 
 export function shuffleFlashcards(cards: Flashcard[]): Flashcard[] {

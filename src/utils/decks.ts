@@ -9,6 +9,14 @@ export function studyDeckHref(deck: Pick<Deck, 'id' | 'name'>): Href {
   };
 }
 
+export function searchDeckHref(deck: Pick<Deck, 'id'>): Href {
+  return { pathname: '/decks/[deckId]', params: { deckId: deck.id } };
+}
+
+export function editDeckHref(deck: Pick<Deck, 'id'>): Href {
+  return { pathname: '/decks/[deckId]/edit', params: { deckId: deck.id } };
+}
+
 const TITLE_RANK = 0;
 const TAG_RANK = 1;
 const DESCRIPTION_RANK = 2;

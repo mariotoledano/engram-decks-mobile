@@ -38,6 +38,20 @@ export const Colors = {
 
 export type ThemeColor = keyof typeof Colors.light & keyof typeof Colors.dark;
 
+/** Colores de portada compartidos por todos los mazos. El primero es el color por defecto. */
+export const DeckCoverColors = [
+  { name: 'Terracota', value: '#C4622D' },
+  { name: 'Terracota oscuro', value: '#9A4A20' },
+  { name: 'Melocotón', value: '#E08A52' },
+  { name: 'Musgo', value: '#3E6B58' },
+  { name: 'Salvia', value: '#7DAB96' },
+  { name: 'Granate', value: '#9B3A32' },
+  { name: 'Tinta', value: '#1E1A16' },
+  { name: 'Piedra', value: '#6F675F' },
+] as const;
+
+export const DEFAULT_DECK_COVER_COLOR = DeckCoverColors[0].value;
+
 export const Fonts = Platform.select({
   ios: {
     /** iOS `UIFontDescriptorSystemDesignDefault` */

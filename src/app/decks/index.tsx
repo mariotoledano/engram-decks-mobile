@@ -21,7 +21,7 @@ import { MaxContentWidth, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { listDecks } from '@/services/decks';
 import type { Deck } from '@/types/api';
-import { normalizeSearchText, searchDecks, studyDeckHref } from '@/utils/decks';
+import { editDeckHref, normalizeSearchText, searchDeckHref, searchDecks, studyDeckHref } from '@/utils/decks';
 import { requestErrorMessage } from '@/utils/request-feedback';
 
 function resultLabel(count: number): string {
@@ -156,6 +156,7 @@ export default function DecksScreen() {
             ref={listRef}
             style={styles.listFlex}
             data={visibleDecks}
+            extraData={mode}
             keyExtractor={(item) => item.id}
             keyboardShouldPersistTaps="handled"
             contentContainerStyle={styles.list}
@@ -185,7 +186,9 @@ export default function DecksScreen() {
             renderItem={({ item }) => (
               <DeckCard
                 deck={item}
-                href={mode === 'study' ? studyDeckHref(item) : undefined}
+                href={
+                  mode === 'study' ? studyDeckHref(item) : mode === 'search' ? searchDeckHref(item) : editDeckHref(item)
+                }
               />
             )}
           />

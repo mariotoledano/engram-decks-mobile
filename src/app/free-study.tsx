@@ -1,6 +1,6 @@
 import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useMemo, useRef, useState } from 'react';
-import { Platform, Pressable, ScrollView, StyleSheet, TextInput, View, type ViewStyle } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { CardCountSlider } from '@/components/card-count-slider';
@@ -175,9 +175,9 @@ export default function FreeStudyScreen() {
             ) : null}
             <ThemedView type="backgroundElement" style={[styles.box, { borderColor: theme.line }]}>
               <ScrollView
-                style={[styles.boxScroll, Platform.OS === 'web' ? webHiddenScrollbar : null]}
+                style={styles.boxScroll}
                 contentContainerStyle={styles.chips}
-                showsVerticalScrollIndicator={false}
+                showsVerticalScrollIndicator
                 keyboardShouldPersistTaps="handled">
                 {visible.length === 0 ? (
                   <ThemedText themeColor="textSecondary">
@@ -232,8 +232,6 @@ export default function FreeStudyScreen() {
     </ThemedView>
   );
 }
-
-const webHiddenScrollbar = { scrollbarWidth: 'none' } as ViewStyle;
 
 const styles = StyleSheet.create({
   screen: {

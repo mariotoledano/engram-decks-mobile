@@ -33,11 +33,27 @@ export default function RootLayout() {
           }}>
           <Stack.Screen name="index" options={{ title: 'Engram Decks' }} />
           <Stack.Screen
-            name="decks"
+            name="decks/index"
             options={{
               title: 'Mazos',
               headerBackVisible: false,
               headerLeft: () => <HomeBackLink />,
+            }}
+          />
+          <Stack.Screen
+            name="decks/[deckId]/index"
+            options={{
+              title: '',
+              headerBackVisible: false,
+              headerLeft: () => <BackLink />,
+            }}
+          />
+          <Stack.Screen
+            name="decks/[deckId]/edit"
+            options={{
+              title: 'Edición de mazo',
+              headerBackVisible: false,
+              headerLeft: () => <BackLink />,
             }}
           />
           <Stack.Screen

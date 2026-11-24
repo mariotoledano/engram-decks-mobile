@@ -12,10 +12,11 @@ import {
 } from 'react-native';
 
 import { CardModeSwitch, type CardMode } from '@/components/card-mode-switch';
+import { AddChipButton, ChipPicker } from '@/components/chip-picker';
 import { ErrorView } from '@/components/error-view';
-import { FilterChipBox, type FilterChip } from '@/components/filter-chip-box';
+import { FilterChipButton, type FilterChip } from '@/components/filter-chip-box';
 import { FlashcardRow } from '@/components/flashcard-row';
-import { ChevronDownIcon, DeckIcon, TagIcon } from '@/components/icons';
+import { DeckIcon, PlusIcon, TagIcon } from '@/components/icons';
 import { LoadingView } from '@/components/loading-view';
 import { SCROLL_TOP_OFFSET, ScrollToTopButton } from '@/components/scroll-to-top-button';
 import { SearchField } from '@/components/search-field';
@@ -31,31 +32,19 @@ import { filterDecksByName, normalizeSearchText } from '@/utils/decks';
 import {
   filterFlashcardsByDecks,
   filterFlashcardsByTags,
+  filterFlashcardsWithoutDecks,
+  filterFlashcardsWithoutTags,
   filterTagNames,
   searchFlashcards,
   tagKey,
 } from '@/utils/flashcards';
 import { requestErrorMessage } from '@/utils/request-feedback';
 
-const SOURCE_CHIP_BOX_HEIGHT = 64;
+const UNTAGGED_CHIP_KEY = 'missing:tags';
+const UNLINKED_CHIP_KEY = 'missing:decks';
 
 function resultLabel(count: number): string {
   return count === 1 ? '1 tarjeta' : `${count} tarjetas`;
-}
-
-function filterSelectionLabel(tagCount: number, deckCount: number): string | null {
-  const parts: string[] = [];
-  if (tagCount === 1) {
-    parts.push('1 etiqueta');
-  } else if (tagCount > 1) {
-    parts.push(`${tagCount} etiquetas`);
-  }
-  if (deckCount === 1) {
-    parts.push('1 mazo');
-  } else if (deckCount > 1) {
-    parts.push(`${deckCount} mazos`);
-  }
-  return parts.length === 0 ? null : parts.join(' · ');
 }
 
 export default function CardsScreen() {
@@ -68,71 +57,152 @@ export default function CardsScreen() {
   const [decks, setDecks] = useState<Deck[] | null>(null);
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [selectedDecks, setSelectedDecks] = useState<Deck[]>([]);
+  const [untaggedOnly, setUntaggedOnly] = useState(false);
+  const [unlinkedOnly, setUnlinkedOnly] = useState(false);
   const [showScrollTop, setShowScrollTop] = useState(false);
   const [query, setQuery] = useState('');
+  const [sourceQuery, setSourceQuery] = useState('');
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [mode, setMode] = useState<CardMode>('search');
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set());
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [tagsError, setTagsError] = useState<string | null>(null);
   const [decksError, setDecksError] = useState<string | null>(null);
   const searching = normalizeSearchText(query).length > 0;
-  const filtering = searching || selectedTags.length > 0 || selectedDecks.length > 0;
-  const matchingTags = useMemo(() => filterTagNames(tags ?? [], query), [tags, query]);
+  const filtering =
+    searching || selectedTags.length > 0 || selectedDecks.length > 0 || untaggedOnly || unlinkedOnly;
+  const matchingTags = useMemo(() => filterTagNames(tags ?? [], sourceQuery), [tags, sourceQuery]);
   const selectedTagKeys = useMemo(() => new Set(selectedTags.map(tagKey)), [selectedTags]);
-  const visibleTags = useMemo(() => {
-    const rest = matchingTags.filter((tag) => !selectedTagKeys.has(tagKey(tag)));
-    return [...selectedTags, ...rest];
-  }, [matchingTags, selectedTagKeys, selectedTags]);
-  const matchingDecks = useMemo(() => filterDecksByName(decks ?? [], query), [decks, query]);
+  const matchingDecks = useMemo(() => filterDecksByName(decks ?? [], sourceQuery), [decks, sourceQuery]);
   const selectedDeckIds = useMemo(() => new Set(selectedDecks.map((deck) => deck.id)), [selectedDecks]);
-  const visibleDecks = useMemo(() => {
-    const selected = selectedDecks.map((deck) => decks?.find((item) => item.id === deck.id) ?? deck);
-    const rest = matchingDecks.filter((deck) => !selectedDeckIds.has(deck.id));
-    return [...selected, ...rest];
-  }, [decks, matchingDecks, selectedDeckIds, selectedDecks]);
   const visibleCards = useMemo(() => {
     if (cards === null) {
       return [];
     }
     const byText = searchFlashcards(cards, query);
-    const byTags = filterFlashcardsByTags(byText, selectedTags);
-    return filterFlashcardsByDecks(
-      byTags,
-      selectedDecks.map((deck) => deck.id),
-    );
-  }, [cards, query, selectedDecks, selectedTags]);
-  const filterSelection = filterSelectionLabel(selectedTags.length, selectedDecks.length);
+    const byTags = untaggedOnly ? filterFlashcardsWithoutTags(byText) : filterFlashcardsByTags(byText, selectedTags);
+    return unlinkedOnly
+      ? filterFlashcardsWithoutDecks(byTags)
+      : filterFlashcardsByDecks(
+          byTags,
+          selectedDecks.map((deck) => deck.id),
+        );
+  }, [cards, query, selectedDecks, selectedTags, unlinkedOnly, untaggedOnly]);
   const catalogsEmpty = tags !== null && decks !== null && tags.length === 0 && decks.length === 0;
-  const sourceEmptyLabel = catalogsEmpty ? 'No hay etiquetas ni mazos' : 'Nada coincide con la búsqueda';
+  const sourceEmptyLabel =
+    tags === null || decks === null
+      ? 'Cargando…'
+      : catalogsEmpty
+        ? 'No hay etiquetas ni mazos'
+        : 'Nada coincide con la búsqueda';
   const sourceError = tags === null ? tagsError : decks === null ? decksError : null;
-  const sourceChips = useMemo<FilterChip[]>(() => {
-    const tagsFirst = [
-      ...visibleTags.map((tag) => ({
+  const untaggedChip = useMemo<FilterChip>(
+    () => ({
+      key: UNTAGGED_CHIP_KEY,
+      label: 'Sin etiqueta asignada',
+      selected: untaggedOnly,
+      accessibilityLabel: 'Sin etiqueta asignada',
+      Icon: TagIcon,
+    }),
+    [untaggedOnly],
+  );
+  const unlinkedChip = useMemo<FilterChip>(
+    () => ({
+      key: UNLINKED_CHIP_KEY,
+      label: 'Sin mazos vinculados',
+      selected: unlinkedOnly,
+      accessibilityLabel: 'Sin mazos vinculados',
+      Icon: DeckIcon,
+    }),
+    [unlinkedOnly],
+  );
+  const selectedChips = useMemo<FilterChip[]>(
+    () => [
+      ...(untaggedOnly ? [untaggedChip] : []),
+      ...selectedTags.map((tag) => ({
         key: `tag:${tagKey(tag)}`,
         label: tag,
-        selected: selectedTagKeys.has(tagKey(tag)),
+        selected: true,
         accessibilityLabel: `Etiqueta ${tag}`,
         Icon: TagIcon,
       })),
-      ...visibleDecks.map((deck) => ({
+      ...(unlinkedOnly ? [unlinkedChip] : []),
+      ...selectedDecks.map((deck) => ({
         key: `deck:${deck.id}`,
         label: deck.name,
-        selected: selectedDeckIds.has(deck.id),
+        selected: true,
         accessibilityLabel: `Mazo ${deck.name}`,
         Icon: DeckIcon,
       })),
-    ];
-    return [...tagsFirst.filter((chip) => chip.selected), ...tagsFirst.filter((chip) => !chip.selected)];
-  }, [selectedDeckIds, selectedTagKeys, visibleDecks, visibleTags]);
+    ],
+    [selectedDecks, selectedTags, unlinkedChip, unlinkedOnly, untaggedChip, untaggedOnly],
+  );
+  const absenceChips = useMemo<FilterChip[]>(() => [untaggedChip, unlinkedChip], [unlinkedChip, untaggedChip]);
+  const sourceChips = useMemo<FilterChip[]>(
+    () => [
+      ...selectedTags.map((tag) => ({
+        key: `tag:${tagKey(tag)}`,
+        label: tag,
+        selected: true,
+        accessibilityLabel: `Etiqueta ${tag}`,
+        Icon: TagIcon,
+      })),
+      ...matchingTags
+        .filter((tag) => !selectedTagKeys.has(tagKey(tag)))
+        .map((tag) => ({
+          key: `tag:${tagKey(tag)}`,
+          label: tag,
+          selected: false,
+          accessibilityLabel: `Etiqueta ${tag}`,
+          Icon: TagIcon,
+        })),
+      ...selectedDecks.map((deck) => ({
+        key: `deck:${deck.id}`,
+        label: deck.name,
+        selected: true,
+        accessibilityLabel: `Mazo ${deck.name}`,
+        Icon: DeckIcon,
+      })),
+      ...matchingDecks
+        .filter((deck) => !selectedDeckIds.has(deck.id))
+        .map((deck) => ({
+          key: `deck:${deck.id}`,
+          label: deck.name,
+          selected: false,
+          accessibilityLabel: `Mazo ${deck.name}`,
+          Icon: DeckIcon,
+        })),
+    ],
+    [matchingDecks, matchingTags, selectedDeckIds, selectedDecks, selectedTagKeys, selectedTags],
+  );
+
+  const changeMode = useCallback((next: CardMode) => {
+    setMode(next);
+    if (next !== 'edit') {
+      setSelectedIds(new Set());
+    }
+  }, []);
+
+  const toggleCard = useCallback((id: string) => {
+    setSelectedIds((current) => {
+      const next = new Set(current);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
+      return next;
+    });
+  }, []);
 
   useLayoutEffect(() => {
     navigation.setOptions({
-      headerRight: () => <CardModeSwitch value={mode} onChange={setMode} />,
+      headerRight: () => <CardModeSwitch value={mode} onChange={changeMode} />,
       headerRightContainerStyle: { paddingRight: Spacing.three },
     });
-  }, [navigation, mode]);
+  }, [navigation, mode, changeMode]);
 
   const loadCards = useCallback(async (loadMode: 'initial' | 'refresh') => {
     if (loadMode === 'initial') {
@@ -197,40 +267,58 @@ export default function CardsScreen() {
     listRef.current?.scrollToOffset({ offset: 0, animated: true });
   }, []);
 
+  const toggleUntagged = useCallback(() => {
+    if (!untaggedOnly) {
+      setSelectedTags([]);
+    }
+    setUntaggedOnly((current) => !current);
+  }, [untaggedOnly]);
+
+  const toggleUnlinked = useCallback(() => {
+    if (!unlinkedOnly) {
+      setSelectedDecks([]);
+    }
+    setUnlinkedOnly((current) => !current);
+  }, [unlinkedOnly]);
+
   const toggleTag = useCallback(
     (key: string) => {
-      const tag = visibleTags.find((item) => tagKey(item) === key);
-      if (!tag) {
-        return;
-      }
+      setUntaggedOnly(false);
       setSelectedTags((current) => {
         if (current.some((item) => tagKey(item) === key)) {
           return current.filter((item) => tagKey(item) !== key);
         }
-        return [tag, ...current];
+        const tag = (tags ?? []).find((item) => tagKey(item) === key);
+        return tag ? [tag, ...current] : current;
       });
     },
-    [visibleTags],
+    [tags],
   );
 
   const toggleDeck = useCallback(
     (id: string) => {
-      const deck = visibleDecks.find((item) => item.id === id);
-      if (!deck) {
-        return;
-      }
+      setUnlinkedOnly(false);
       setSelectedDecks((current) => {
         if (current.some((item) => item.id === id)) {
           return current.filter((item) => item.id !== id);
         }
-        return [deck, ...current];
+        const deck = (decks ?? []).find((item) => item.id === id);
+        return deck ? [deck, ...current] : current;
       });
     },
-    [visibleDecks],
+    [decks],
   );
 
   const toggleSource = useCallback(
     (key: string) => {
+      if (key === UNTAGGED_CHIP_KEY) {
+        toggleUntagged();
+        return;
+      }
+      if (key === UNLINKED_CHIP_KEY) {
+        toggleUnlinked();
+        return;
+      }
       if (key.startsWith('tag:')) {
         toggleTag(key.slice(4));
         return;
@@ -239,12 +327,17 @@ export default function CardsScreen() {
         toggleDeck(key.slice(5));
       }
     },
-    [toggleDeck, toggleTag],
+    [toggleDeck, toggleTag, toggleUnlinked, toggleUntagged],
   );
 
   const retry = useCallback(() => {
     void loadCards(cardsRef.current === null ? 'initial' : 'refresh');
   }, [loadCards]);
+
+  const openFilters = useCallback(() => {
+    setSourceQuery('');
+    setFiltersOpen(true);
+  }, []);
 
   const listHeader =
     filtering || error ? (
@@ -281,42 +374,36 @@ export default function CardsScreen() {
               accessibilityLabel="Buscar tarjetas"
               clearLabel="Borrar búsqueda de tarjetas"
             />
-            <View style={styles.filterGroup}>
-              <Pressable
-                accessibilityRole="button"
-                accessibilityState={{ expanded: filtersOpen }}
-                accessibilityLabel="Etiquetas y mazos"
-                onPress={() => setFiltersOpen((open) => !open)}
-                style={[styles.filterToggle, Platform.OS === 'web' ? styles.webPointer : null]}>
-                <View style={{ transform: [{ rotate: filtersOpen ? '180deg' : '0deg' }] }}>
-                  <ChevronDownIcon color={theme.textSecondary} size={18} />
-                </View>
-                <ThemedText type="smallBold" style={styles.filterTitle}>
-                  Etiquetas y mazos
-                </ThemedText>
-                {!filtersOpen && filterSelection ? (
-                  <ThemedText type="small" themeColor="textSecondary" numberOfLines={1}>
-                    {filterSelection}
-                  </ThemedText>
-                ) : null}
-              </Pressable>
-              {filtersOpen ? (
-                <FilterChipBox
-                  chips={sourceChips}
-                  Icon={TagIcon}
-                  emptyLabel={sourceEmptyLabel}
-                  error={sourceChips.length === 0 ? sourceError : null}
-                  height={SOURCE_CHIP_BOX_HEIGHT}
-                  onPress={toggleSource}
-                  onRetry={retry}
-                />
-              ) : null}
+            <View style={styles.filterRow}>
+              {selectedChips.map((chip) => (
+                <FilterChipButton key={chip.key} chip={chip} Icon={TagIcon} onPress={toggleSource} />
+              ))}
+              {selectedChips.length > 0 ? (
+                <AddChipButton label="Filtrar por etiquetas o mazos" onPress={openFilters} />
+              ) : (
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel="Filtrar por etiquetas o mazos"
+                  onPress={openFilters}
+                  style={({ pressed }) => [
+                    styles.promptChip,
+                    {
+                      borderColor: theme.line,
+                      backgroundColor: pressed ? theme.backgroundSelected : theme.background,
+                    },
+                    Platform.OS === 'web' ? styles.webPointer : null,
+                  ]}>
+                  <PlusIcon color={theme.textSecondary} size={16} />
+                  <ThemedText type="small">Filtrar por etiquetas o mazos</ThemedText>
+                </Pressable>
+              )}
             </View>
           </ThemedView>
           <FlatList
             ref={listRef}
             style={styles.listFlex}
             data={visibleCards}
+            extraData={mode === 'edit' ? selectedIds : mode}
             keyExtractor={(item) => item.id}
             keyboardShouldPersistTaps="handled"
             contentContainerStyle={styles.list}
@@ -346,12 +433,32 @@ export default function CardsScreen() {
             renderItem={({ item }) => (
               <FlashcardRow
                 card={item}
+                selecting={mode === 'edit'}
+                selected={selectedIds.has(item.id)}
+                onToggleSelect={() => toggleCard(item.id)}
                 onInspect={() => router.push(`/cards/${item.id}` as Href)}
                 onEdit={() => router.push(`/cards/${item.id}/edit` as Href)}
               />
             )}
           />
           {showScrollTop ? <ScrollToTopButton onPress={scrollToTop} /> : null}
+          <ChipPicker
+            visible={filtersOpen}
+            closeLabel="Cerrar filtros"
+            onClose={() => setFiltersOpen(false)}
+            query={sourceQuery}
+            onQueryChange={setSourceQuery}
+            placeholder="Buscar etiquetas y mazos"
+            searchLabel="Buscar etiquetas y mazos"
+            clearLabel="Borrar búsqueda de etiquetas y mazos"
+            chips={sourceChips}
+            leadingChips={absenceChips}
+            Icon={TagIcon}
+            emptyLabel={sourceEmptyLabel}
+            error={sourceChips.length === 0 ? sourceError : null}
+            onPress={toggleSource}
+            onRetry={retry}
+          />
         </>
       )}
     </ThemedView>
@@ -371,17 +478,21 @@ const styles = StyleSheet.create({
     paddingTop: Spacing.three,
     paddingBottom: Spacing.two,
   },
-  filterGroup: {
-    gap: Spacing.two,
-  },
-  filterToggle: {
-    minHeight: 44,
+  filterRow: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     alignItems: 'center',
     gap: Spacing.two,
   },
-  filterTitle: {
-    flex: 1,
+  promptChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.one,
+    borderWidth: 1,
+    borderRadius: 999,
+    paddingVertical: Spacing.one,
+    paddingLeft: Spacing.two,
+    paddingRight: Spacing.three,
   },
   webPointer: {
     cursor: 'pointer',

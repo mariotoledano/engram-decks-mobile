@@ -19,6 +19,7 @@ export interface FilterChip {
 
 interface FilterChipBoxProps {
   chips: FilterChip[];
+  leadingChips?: FilterChip[];
   Icon: (props: IconProps) => ReactNode;
   emptyLabel: string;
   error?: string | null;
@@ -27,18 +28,67 @@ interface FilterChipBoxProps {
   onRetry?: () => void;
 }
 
-export function FilterChipBox({ chips, Icon, emptyLabel, error, height, onPress, onRetry }: FilterChipBoxProps) {
+export function FilterChipButton({
+  chip,
+  Icon,
+  onPress,
+}: {
+  chip: FilterChip;
+  Icon: (props: IconProps) => ReactNode;
+  onPress: (key: string) => void;
+}) {
   const theme = useTheme();
+  const ChipIcon = chip.Icon ?? Icon;
+
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityState={{ selected: chip.selected }}
+      accessibilityLabel={chip.accessibilityLabel}
+      onPress={() => onPress(chip.key)}
+      style={[
+        styles.chip,
+        {
+          backgroundColor: chip.selected ? theme.backgroundSelected : theme.background,
+          borderColor: chip.selected ? theme.accent : theme.line,
+        },
+      ]}>
+      <View style={styles.chipIcon}>
+        <ChipIcon color={chip.selected ? theme.accent : theme.textSecondary} size={16} />
+      </View>
+      <ThemedText type="small" numberOfLines={1} ellipsizeMode="tail" style={styles.chipLabel}>
+        {chip.label}
+      </ThemedText>
+    </Pressable>
+  );
+}
+
+export function FilterChipBox({
+  chips,
+  leadingChips = [],
+  Icon,
+  emptyLabel,
+  error,
+  height,
+  onPress,
+  onRetry,
+}: FilterChipBoxProps) {
+  const theme = useTheme();
+
+  const leading = leadingChips.map((chip) => (
+    <FilterChipButton key={chip.key} chip={chip} Icon={Icon} onPress={onPress} />
+  ));
 
   return (
     <ThemedView type="backgroundElement" style={[styles.box, { borderColor: theme.line, height: height ?? CHIP_BOX_HEIGHT }]}>
       <ScrollView
-        style={[styles.boxScroll, Platform.OS === 'web' ? webHiddenScrollbar : null]}
+        style={[styles.boxScroll, Platform.OS === 'web' ? webVerticalScroll : null]}
         contentContainerStyle={styles.chips}
-        showsVerticalScrollIndicator={false}
+        showsVerticalScrollIndicator
         keyboardShouldPersistTaps="handled"
         nestedScrollEnabled>
-        {error ? (
+        {leading}
+        {error && chips.length === 0 ? (
           <View style={styles.boxMessage}>
             <ThemedText themeColor="textSecondary">{error}</ThemedText>
             {onRetry ? (
@@ -48,40 +98,18 @@ export function FilterChipBox({ chips, Icon, emptyLabel, error, height, onPress,
             ) : null}
           </View>
         ) : chips.length === 0 ? (
-          <ThemedText themeColor="textSecondary">{emptyLabel}</ThemedText>
+          <ThemedText themeColor="textSecondary" style={styles.fullRow}>
+            {emptyLabel}
+          </ThemedText>
         ) : (
-          chips.map((chip) => {
-            const ChipIcon = chip.Icon ?? Icon;
-            return (
-              <Pressable
-                key={chip.key}
-                accessibilityRole="button"
-                accessibilityState={{ selected: chip.selected }}
-                accessibilityLabel={chip.accessibilityLabel}
-                onPress={() => onPress(chip.key)}
-                style={[
-                  styles.chip,
-                  {
-                    backgroundColor: chip.selected ? theme.backgroundSelected : theme.background,
-                    borderColor: chip.selected ? theme.accent : theme.line,
-                  },
-                ]}>
-                <View style={styles.chipIcon}>
-                  <ChipIcon color={chip.selected ? theme.accent : theme.textSecondary} size={16} />
-                </View>
-                <ThemedText type="small" numberOfLines={1} ellipsizeMode="tail" style={styles.chipLabel}>
-                  {chip.label}
-                </ThemedText>
-              </Pressable>
-            );
-          })
+          chips.map((chip) => <FilterChipButton key={chip.key} chip={chip} Icon={Icon} onPress={onPress} />)
         )}
       </ScrollView>
     </ThemedView>
   );
 }
 
-const webHiddenScrollbar = { scrollbarWidth: 'none' } as ViewStyle;
+const webVerticalScroll = { overflowY: 'scroll' } as ViewStyle;
 
 const styles = StyleSheet.create({
   box: {
@@ -122,6 +150,10 @@ const styles = StyleSheet.create({
     flexShrink: 1,
   },
   boxMessage: {
+    width: '100%',
     gap: Spacing.two,
+  },
+  fullRow: {
+    width: '100%',
   },
 });
