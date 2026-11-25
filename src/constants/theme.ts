@@ -52,6 +52,12 @@ export const DeckCoverColors = [
 
 export const DEFAULT_DECK_COVER_COLOR = DeckCoverColors[0].value;
 
+/** Marco fijo de la portada en la ficha del mazo. El encuadre del editor usa esta misma proporción. */
+export const DeckCoverFrame = {
+  width: 140,
+  height: 240,
+} as const;
+
 export const Fonts = Platform.select({
   ios: {
     /** iOS `UIFontDescriptorSystemDesignDefault` */

@@ -28,6 +28,10 @@ const API_MESSAGES: Record<string, string> = {
   'At least one flashcard is required': 'Selecciona al menos una tarjeta.',
   'A session can contain at most 200 flashcards': 'Una sesión puede incluir como máximo 200 tarjetas.',
   'Flashcard id must not be blank': 'Falta el identificador de una tarjeta.',
+  'Flashcard ids are required': 'Falta el orden de las tarjetas.',
+  'Flashcard order must list every card in the deck exactly once':
+    'El orden tiene que incluir cada tarjeta del mazo una sola vez.',
+  'A deck can order at most 5000 flashcards': 'Un mazo puede ordenar como máximo 5000 tarjetas.',
   'Limit is required': 'Indica cuántas tarjetas quieres estudiar.',
   'Limit must be at least 1': 'Elige al menos 1 tarjeta.',
   'Limit must be at most 200': 'Puedes estudiar como máximo 200 tarjetas a la vez.',

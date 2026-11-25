@@ -25,6 +25,12 @@ export interface Flashcard {
   tags?: string[];
   createdAt?: string;
   updatedAt?: string;
+  /** Índice dentro de un mazo. 0 es la primera tarjeta. */
+  position?: number | null;
+}
+
+export interface ReorderFlashcardsRequest {
+  flashcardIds: string[];
 }
 
 export interface CreateDeckRequest {

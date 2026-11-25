@@ -1,9 +1,10 @@
 import { router, useLocalSearchParams, useNavigation, type Href } from 'expo-router';
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { FlatList, Image, Modal, Platform, Pressable, RefreshControl, StyleSheet, TextInput, View } from 'react-native';
+import { FlatList, Image, Modal, Platform, Pressable, RefreshControl, StyleSheet, TextInput, View, type LayoutChangeEvent } from 'react-native';
 
 import { BackLink } from '@/components/back-link';
 import { CoverPicker } from '@/components/cover-picker';
+import { DeckReorderCell, DeckReorderProvider, type ListFrame, type ReorderControls } from '@/components/deck-reorder';
 import { ErrorView } from '@/components/error-view';
 import { FilterChipBox, FilterChipButton, type FilterChip } from '@/components/filter-chip-box';
 import { FlashcardRow } from '@/components/flashcard-row';
@@ -13,16 +14,15 @@ import { PrimaryButton } from '@/components/primary-button';
 import { SearchField } from '@/components/search-field';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { DEFAULT_DECK_COVER_COLOR, MaxContentWidth, Spacing } from '@/constants/theme';
+import { DeckCoverFrame, DEFAULT_DECK_COVER_COLOR, MaxContentWidth, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { getDeck, patchDeck } from '@/services/decks';
-import { listFlashcardsByDeck } from '@/services/flashcards';
+import { listFlashcardsByDeck, reorderFlashcards } from '@/services/flashcards';
 import { listTags } from '@/services/tags';
 import type { Deck, DeckCover, Flashcard } from '@/types/api';
 import { filterTagNames, tagKey } from '@/utils/flashcards';
 import { requestErrorMessage } from '@/utils/request-feedback';
 
-const COVER_WIDTH = 140;
 const NAME_MAX_LENGTH = 120;
 const DESCRIPTION_MAX_LENGTH = 2000;
 const MAX_TAGS = 20;
@@ -33,6 +33,10 @@ function routeParam(value: string | string[] | undefined): string {
     return value[0] ?? '';
   }
   return value ?? '';
+}
+
+function sameIds(left: string[], right: string[]): boolean {
+  return left.length === right.length && left.every((id, index) => id === right[index]);
 }
 
 function coverColor(cover: DeckCover | undefined, fallback: string): string {
@@ -102,6 +106,16 @@ export function DeckDetailScreen({ editable = false }: DeckDetailScreenProps) {
   const params = useLocalSearchParams<{ deckId: string }>();
   const deckId = routeParam(params.deckId);
   const formReady = useRef(false);
+  const orderDirty = useRef(false);
+  const savedOrder = useRef<string[] | null>(null);
+  const listRef = useRef<FlatList<Flashcard>>(null);
+  const listFrame = useRef<ListFrame>({ top: 0, height: 0 });
+  const listNode = useRef<LayoutChangeEvent['target'] | null>(null);
+  const reorderControls = useRef<ReorderControls>({
+    setOffset: () => undefined,
+    scrollTo: () => undefined,
+    measure: () => undefined,
+  });
   const [deck, setDeck] = useState<Deck | null>(null);
   const [cards, setCards] = useState<Flashcard[] | null>(null);
   const [name, setName] = useState('');
@@ -178,7 +192,10 @@ export function DeckDetailScreen({ editable = false }: DeckDetailScreenProps) {
         setError(requestErrorMessage(deckResult.reason));
       }
       if (cardsResult.status === 'fulfilled') {
-        setCards(cardsResult.value);
+        if (!(editable && orderDirty.current)) {
+          setCards(cardsResult.value);
+          savedOrder.current = cardsResult.value.map((card) => card.id);
+        }
         setCardsError(null);
       } else {
         setCardsError(requestErrorMessage(cardsResult.reason));
@@ -239,6 +256,25 @@ export function DeckDetailScreen({ editable = false }: DeckDetailScreenProps) {
     setCoverOpen(false);
   }, []);
 
+  const moveCard = useCallback((from: number, to: number) => {
+    if (saving || from === to) {
+      return;
+    }
+    setCards((current) => {
+      if (!current || from < 0 || to < 0 || from >= current.length || to >= current.length) {
+        return current;
+      }
+      const next = current.slice();
+      const [moved] = next.splice(from, 1);
+      if (!moved) {
+        return current;
+      }
+      next.splice(to, 0, moved);
+      return next;
+    });
+    orderDirty.current = true;
+  }, [saving]);
+
   const save = useCallback(async () => {
     const nextName = name.trim();
     const nextDescription = description.trim();
@@ -256,13 +292,18 @@ export function DeckDetailScreen({ editable = false }: DeckDetailScreenProps) {
         tags: selectedTags,
         cover: cover ?? { type: 'COLOR', value: DEFAULT_DECK_COVER_COLOR },
       });
+      const ids = (cards ?? []).map((card) => card.id);
+      const orderChanged = savedOrder.current !== null && !sameIds(savedOrder.current, ids);
+      if (orderChanged) {
+        await reorderFlashcards(deckId, ids);
+      }
       router.back();
     } catch (requestError) {
       setNotice(requestErrorMessage(requestError));
     } finally {
       setSaving(false);
     }
-  }, [cover, deckId, description, name, selectedTags]);
+  }, [cards, cover, deckId, description, name, selectedTags]);
 
   const listHeader = deck ? (
     <View style={styles.header}>
@@ -386,9 +427,86 @@ export function DeckDetailScreen({ editable = false }: DeckDetailScreenProps) {
         )}
       </View>
       <ThemedText type="smallBold">Tarjetas</ThemedText>
+      {editable ? (
+        <ThemedText type="small" themeColor="textSecondary">
+          Mantén pulsada una tarjeta y arrástrala para cambiar el orden.
+        </ThemedText>
+      ) : null}
       {cardsError ? <FeedbackBanner message={cardsError} onRetry={retry} /> : null}
     </View>
   ) : null;
+
+  const readListFrame = (target: LayoutChangeEvent['target'] | null, fallback?: { y: number; height: number }) => {
+    const node = target as {
+      measureInWindow?: (callback: (x: number, y: number, width: number, height: number) => void) => void;
+      getBoundingClientRect?: () => { top: number; height: number };
+    } | null;
+    if (node && typeof node.measureInWindow === 'function') {
+      node.measureInWindow((_x, y, _width, height) => {
+        listFrame.current = { top: y, height };
+      });
+      return;
+    }
+    const rect = node?.getBoundingClientRect?.();
+    if (rect) {
+      listFrame.current = { top: rect.top, height: rect.height };
+      return;
+    }
+    if (fallback) {
+      listFrame.current = { top: fallback.y, height: fallback.height };
+    }
+  };
+  reorderControls.current.scrollTo = (offset) => {
+    listRef.current?.scrollToOffset({ offset: Math.max(0, offset), animated: false });
+  };
+  reorderControls.current.measure = () => {
+    readListFrame(listNode.current);
+  };
+
+  const list = (
+    <View
+      style={styles.listFlex}
+      onLayout={(event) => {
+        listNode.current = event.target;
+        readListFrame(event.target, event.nativeEvent.layout);
+      }}>
+      <FlatList
+        ref={listRef}
+        style={styles.listFlex}
+        data={cards ?? []}
+        keyExtractor={(item) => item.id}
+        keyboardShouldPersistTaps="handled"
+        contentContainerStyle={styles.list}
+        scrollEventThrottle={16}
+        onScroll={(event) => reorderControls.current.setOffset(event.nativeEvent.contentOffset.y)}
+        CellRendererComponent={editable ? DeckReorderCell : undefined}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={() => void load('refresh')}
+            tintColor={theme.text}
+            colors={[theme.text]}
+          />
+        }
+        ListHeaderComponent={listHeader ?? undefined}
+        ListEmptyComponent={
+          cardsError || cards === null ? undefined : (
+            <ThemedView style={styles.empty}>
+              <ThemedText type="smallBold">Este mazo no tiene tarjetas</ThemedText>
+            </ThemedView>
+          )
+        }
+        renderItem={({ item, index }) => (
+          <FlashcardRow
+            card={item}
+            index={index}
+            onInspect={() => router.push(`/cards/${item.id}` as Href)}
+            onEdit={editable ? () => router.push(`/cards/${item.id}/edit` as Href) : undefined}
+          />
+        )}
+      />
+    </View>
+  );
 
   return (
     <ThemedView style={styles.screen}>
@@ -396,37 +514,17 @@ export function DeckDetailScreen({ editable = false }: DeckDetailScreenProps) {
         <LoadingView />
       ) : error && deck === null ? (
         <ErrorView message={error} onRetry={retry} />
+      ) : editable ? (
+        <DeckReorderProvider
+          enabled={!saving}
+          count={cards?.length ?? 0}
+          onCommit={moveCard}
+          controls={reorderControls}
+          listFrame={listFrame}>
+          {list}
+        </DeckReorderProvider>
       ) : (
-        <FlatList
-          style={styles.listFlex}
-          data={cards ?? []}
-          keyExtractor={(item) => item.id}
-          keyboardShouldPersistTaps="handled"
-          contentContainerStyle={styles.list}
-          refreshControl={
-            <RefreshControl
-              refreshing={refreshing}
-              onRefresh={() => void load('refresh')}
-              tintColor={theme.text}
-              colors={[theme.text]}
-            />
-          }
-          ListHeaderComponent={listHeader ?? undefined}
-          ListEmptyComponent={
-            cardsError || cards === null ? undefined : (
-              <ThemedView style={styles.empty}>
-                <ThemedText type="smallBold">Este mazo no tiene tarjetas</ThemedText>
-              </ThemedView>
-            )
-          }
-          renderItem={({ item }) => (
-            <FlashcardRow
-              card={item}
-              onInspect={() => router.push(`/cards/${item.id}` as Href)}
-              onEdit={editable ? () => router.push(`/cards/${item.id}/edit` as Href) : undefined}
-            />
-          )}
-        />
+        list
       )}
       {editable ? (
         <Modal visible={tagsOpen} transparent animationType="fade" onRequestClose={() => setTagsOpen(false)}>
@@ -501,21 +599,25 @@ const styles = StyleSheet.create({
     gap: Spacing.three,
   },
   coverPressable: {
-    width: COVER_WIDTH,
-    alignSelf: 'stretch',
+    width: DeckCoverFrame.width,
+    height: DeckCoverFrame.height,
+    alignSelf: 'flex-start',
   },
   pressed: {
     opacity: 0.85,
   },
   cover: {
-    width: COVER_WIDTH,
-    alignSelf: 'stretch',
+    width: DeckCoverFrame.width,
+    height: DeckCoverFrame.height,
+    alignSelf: 'flex-start',
     borderWidth: 1,
     borderRadius: Spacing.three,
     overflow: 'hidden',
   },
   coverImage: {
     ...StyleSheet.absoluteFill,
+    width: '100%',
+    height: '100%',
   },
   field: {
     borderWidth: 1,

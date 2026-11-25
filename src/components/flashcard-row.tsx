@@ -3,6 +3,7 @@ import { Platform, Pressable, StyleSheet, View } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, { runOnJS, useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
 
+import { useCardReorder } from '@/components/deck-reorder';
 import { IconButton } from '@/components/icon-button';
 import { CheckIcon, EditSheetIcon, SearchIcon } from '@/components/icons';
 import { ThemedText } from '@/components/themed-text';
@@ -20,6 +21,7 @@ type Face = 'front' | 'back';
 
 interface FlashcardRowProps {
   card: Flashcard;
+  index?: number;
   onInspect: () => void;
   onEdit?: () => void;
   selecting?: boolean;
@@ -29,6 +31,7 @@ interface FlashcardRowProps {
 
 export function FlashcardRow({
   card,
+  index = 0,
   onInspect,
   onEdit,
   selecting = false,
@@ -56,6 +59,8 @@ export function FlashcardRow({
   const toggleSelected = useCallback(() => {
     onToggleSelect?.();
   }, [onToggleSelect]);
+
+  const reorder = useCardReorder(index, card.id);
 
   const gesture = useMemo(() => {
     const turn = (direction: number) => {
@@ -89,8 +94,9 @@ export function FlashcardRow({
         turn(1);
       });
 
-    return selecting ? Gesture.Exclusive(longPress, pan, tap) : Gesture.Exclusive(pan, tap);
-  }, [rotation, selecting, settled, showFace, toggleSelected]);
+    const flip = selecting ? Gesture.Exclusive(longPress, pan, tap) : Gesture.Exclusive(pan, tap);
+    return reorder.gesture ? Gesture.Exclusive(reorder.gesture, flip) : flip;
+  }, [reorder.gesture, rotation, selecting, settled, showFace, toggleSelected]);
 
   const frontStyle = useAnimatedStyle(() => {
     const normalized = ((rotation.value % 360) + 360) % 360;
@@ -112,8 +118,12 @@ export function FlashcardRow({
     };
   });
 
+  const orderingHint = reorder.draggingEnabled
+    ? 'Mantén pulsado y arrastra para cambiar el orden. Toca o desliza horizontalmente para dar la vuelta'
+    : null;
+
   return (
-    <View style={styles.row}>
+    <Animated.View style={[styles.row, reorder.animatedStyle]} onLayout={reorder.onLayout}>
       <View
         style={[
           styles.cardFrame,
@@ -129,7 +139,7 @@ export function FlashcardRow({
               accessibilityHint={
                 selecting
                   ? 'Mantén pulsado para seleccionar. Toca o desliza horizontalmente para dar la vuelta'
-                  : 'Toca o desliza horizontalmente para dar la vuelta'
+                  : (orderingHint ?? 'Toca o desliza horizontalmente para dar la vuelta')
               }>
               <Animated.View
                 style={[styles.face, { backgroundColor: faceColor }, frontStyle]}
@@ -189,7 +199,7 @@ export function FlashcardRow({
           <IconButton icon={EditSheetIcon} accessibilityLabel="Editar tarjeta" onPress={onEdit} />
         ) : null}
       </View>
-    </View>
+    </Animated.View>
   );
 }
 
