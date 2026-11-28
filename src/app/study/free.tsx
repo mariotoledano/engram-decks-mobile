@@ -8,7 +8,6 @@ import { LoadingView } from '@/components/loading-view';
 import { StudyModeSwitch, type StudyMode } from '@/components/study-mode-switch';
 import { StudySession } from '@/components/study-session';
 import { ThemedView } from '@/components/themed-view';
-import { Spacing } from '@/constants/theme';
 import { loadFreeStudyDeck } from '@/services/free-study-cache';
 import type { Flashcard } from '@/types/api';
 import { requestErrorMessage } from '@/utils/request-feedback';
@@ -27,7 +26,6 @@ export default function FreeStudySessionScreen() {
       headerBackVisible: false,
       headerLeft: () => <HomeBackLink />,
       headerRight: () => <StudyModeSwitch value={mode} onChange={setMode} />,
-      headerRightContainerStyle: { paddingRight: Spacing.three },
     });
   }, [navigation, mode]);
 

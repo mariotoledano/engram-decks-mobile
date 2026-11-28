@@ -1,14 +1,15 @@
 import { StyleSheet, View } from 'react-native';
 
 import { IconButton } from '@/components/icon-button';
-import { EditSheetIcon, SearchIcon } from '@/components/icons';
+import { BulletListIcon, EditSheetIcon, SearchIcon } from '@/components/icons';
 import { Spacing } from '@/constants/theme';
 
-export type CardMode = 'search' | 'edit';
+export type CardMode = 'search' | 'edit' | 'list';
 
 const MODES = [
   { id: 'search', label: 'Búsqueda de tarjetas', icon: SearchIcon },
   { id: 'edit', label: 'Edición de tarjetas', icon: EditSheetIcon },
+  { id: 'list', label: 'Edición de lista', icon: BulletListIcon },
 ] as const;
 
 interface CardModeSwitchProps {

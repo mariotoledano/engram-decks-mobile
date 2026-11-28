@@ -130,6 +130,19 @@ export function PlusIcon({ color, size = 20 }: IconProps) {
   );
 }
 
+export function BulletListIcon({ color, size = 20 }: IconProps) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <Circle cx="5" cy="7" r="1.15" fill={color} />
+      <Circle cx="5" cy="12" r="1.15" fill={color} />
+      <Circle cx="5" cy="17" r="1.15" fill={color} />
+      <Path d="M9.25 7H19" stroke={color} strokeWidth={STROKE} strokeLinecap="round" />
+      <Path d="M9.25 12H19" stroke={color} strokeWidth={STROKE} strokeLinecap="round" />
+      <Path d="M9.25 17H19" stroke={color} strokeWidth={STROKE} strokeLinecap="round" />
+    </Svg>
+  );
+}
+
 export function EditSheetIcon({ color, size = 20 }: IconProps) {
   return (
     <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">

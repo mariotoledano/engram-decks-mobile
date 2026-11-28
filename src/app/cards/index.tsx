@@ -23,6 +23,7 @@ import { SearchField } from '@/components/search-field';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { MaxContentWidth, Spacing } from '@/constants/theme';
+import { usePinnedSelectionList } from '@/hooks/use-pinned-selection-list';
 import { useTheme } from '@/hooks/use-theme';
 import { listDecks } from '@/services/decks';
 import { listFlashcards } from '@/services/flashcards';
@@ -38,6 +39,7 @@ import {
   searchFlashcards,
   tagKey,
 } from '@/utils/flashcards';
+import { EMPTY_SELECTION } from '@/utils/pinned-selection';
 import { requestErrorMessage } from '@/utils/request-feedback';
 
 const UNTAGGED_CHIP_KEY = 'missing:tags';
@@ -47,10 +49,41 @@ function resultLabel(count: number): string {
   return count === 1 ? '1 tarjeta' : `${count} tarjetas`;
 }
 
+function sourceSearchRank(label: string, query: string): number {
+  const tokens = normalizeSearchText(query)
+    .split(' ')
+    .filter((token) => token.length > 0);
+  if (tokens.length === 0) {
+    return 0;
+  }
+
+  const normalized = normalizeSearchText(label);
+  let rank = 0;
+  for (const token of tokens) {
+    const index = normalized.indexOf(token);
+    if (index < 0) {
+      return Number.MAX_SAFE_INTEGER;
+    }
+    const atWordStart = index === 0 || normalized.charAt(index - 1) === ' ';
+    const tokenRank = index === 0 ? 0 : atWordStart ? 1_000 + index : 2_000 + index;
+    if (tokenRank > rank) {
+      rank = tokenRank;
+    }
+  }
+  return rank;
+}
+
+function compareSourceChips(left: FilterChip, right: FilterChip, query: string): number {
+  const bySearch = sourceSearchRank(left.label, query) - sourceSearchRank(right.label, query);
+  if (bySearch !== 0) {
+    return bySearch;
+  }
+  return left.label.localeCompare(right.label, 'es');
+}
+
 export default function CardsScreen() {
   const theme = useTheme();
   const navigation = useNavigation();
-  const listRef = useRef<FlatList<Flashcard>>(null);
   const cardsRef = useRef<Flashcard[] | null>(null);
   const [cards, setCards] = useState<Flashcard[] | null>(null);
   const [tags, setTags] = useState<string[] | null>(null);
@@ -64,7 +97,7 @@ export default function CardsScreen() {
   const [sourceQuery, setSourceQuery] = useState('');
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [mode, setMode] = useState<CardMode>('search');
-  const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set());
+  const [selectedIds, setSelectedIds] = useState<ReadonlySet<string>>(() => new Set());
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -140,8 +173,8 @@ export default function CardsScreen() {
     [selectedDecks, selectedTags, unlinkedChip, unlinkedOnly, untaggedChip, untaggedOnly],
   );
   const absenceChips = useMemo<FilterChip[]>(() => [untaggedChip, unlinkedChip], [unlinkedChip, untaggedChip]);
-  const sourceChips = useMemo<FilterChip[]>(
-    () => [
+  const sourceChips = useMemo<FilterChip[]>(() => {
+    const chips: FilterChip[] = [
       ...selectedTags.map((tag) => ({
         key: `tag:${tagKey(tag)}`,
         label: tag,
@@ -174,35 +207,15 @@ export default function CardsScreen() {
           accessibilityLabel: `Mazo ${deck.name}`,
           Icon: DeckIcon,
         })),
-    ],
-    [matchingDecks, matchingTags, selectedDeckIds, selectedDecks, selectedTagKeys, selectedTags],
-  );
-
-  const changeMode = useCallback((next: CardMode) => {
-    setMode(next);
-    if (next !== 'edit') {
-      setSelectedIds(new Set());
-    }
-  }, []);
-
-  const toggleCard = useCallback((id: string) => {
-    setSelectedIds((current) => {
-      const next = new Set(current);
-      if (next.has(id)) {
-        next.delete(id);
-      } else {
-        next.add(id);
-      }
-      return next;
-    });
-  }, []);
+    ];
+    return chips.sort((left, right) => compareSourceChips(left, right, sourceQuery));
+  }, [matchingDecks, matchingTags, selectedDeckIds, selectedDecks, selectedTagKeys, selectedTags, sourceQuery]);
 
   useLayoutEffect(() => {
     navigation.setOptions({
-      headerRight: () => <CardModeSwitch value={mode} onChange={changeMode} />,
-      headerRightContainerStyle: { paddingRight: Spacing.three },
+      headerRight: () => <CardModeSwitch value={mode} onChange={setMode} />,
     });
-  }, [navigation, mode, changeMode]);
+  }, [navigation, mode]);
 
   const loadCards = useCallback(async (loadMode: 'initial' | 'refresh') => {
     if (loadMode === 'initial') {
@@ -258,14 +271,31 @@ export default function CardsScreen() {
     }, [loadCards]),
   );
 
-  const onListScroll = useCallback((event: NativeSyntheticEvent<NativeScrollEvent>) => {
-    const visible = event.nativeEvent.contentOffset.y > SCROLL_TOP_OFFSET;
-    setShowScrollTop((current) => (current === visible ? current : visible));
-  }, []);
+  const pinnedIds = mode === 'list' ? selectedIds : EMPTY_SELECTION;
+  const {
+    listRef,
+    ordered: listedCards,
+    onScroll: trackListScroll,
+    onScrollBeginDrag: releaseCameraLock,
+    onContentSizeChange: holdCamera,
+    onItemLayout,
+    wrapHeader,
+    releaseCameraLock: unlockCamera,
+  } = usePinnedSelectionList(visibleCards, pinnedIds);
+
+  const onListScroll = useCallback(
+    (event: NativeSyntheticEvent<NativeScrollEvent>) => {
+      trackListScroll(event);
+      const visible = event.nativeEvent.contentOffset.y > SCROLL_TOP_OFFSET;
+      setShowScrollTop((current) => (current === visible ? current : visible));
+    },
+    [trackListScroll],
+  );
 
   const scrollToTop = useCallback(() => {
+    unlockCamera();
     listRef.current?.scrollToOffset({ offset: 0, animated: true });
-  }, []);
+  }, [listRef, unlockCamera]);
 
   const toggleUntagged = useCallback(() => {
     if (!untaggedOnly) {
@@ -329,6 +359,18 @@ export default function CardsScreen() {
     },
     [toggleDeck, toggleTag, toggleUnlinked, toggleUntagged],
   );
+
+  const toggleSelectedCard = useCallback((id: string) => {
+    setSelectedIds((current) => {
+      const next = new Set(current);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
+      return next;
+    });
+  }, []);
 
   const retry = useCallback(() => {
     void loadCards(cardsRef.current === null ? 'initial' : 'refresh');
@@ -402,13 +444,15 @@ export default function CardsScreen() {
           <FlatList
             ref={listRef}
             style={styles.listFlex}
-            data={visibleCards}
-            extraData={mode === 'edit' ? selectedIds : mode}
+            data={listedCards}
+            extraData={{ mode, selectedIds }}
             keyExtractor={(item) => item.id}
             keyboardShouldPersistTaps="handled"
             contentContainerStyle={styles.list}
             scrollEventThrottle={16}
             onScroll={onListScroll}
+            onScrollBeginDrag={releaseCameraLock}
+            onContentSizeChange={holdCamera}
             refreshControl={
               <RefreshControl
                 refreshing={refreshing}
@@ -417,7 +461,7 @@ export default function CardsScreen() {
                 colors={[theme.text]}
               />
             }
-            ListHeaderComponent={listHeader ?? undefined}
+            ListHeaderComponent={wrapHeader(listHeader)}
             ListEmptyComponent={
               <ThemedView style={styles.empty}>
                 {filtering ? (
@@ -431,14 +475,29 @@ export default function CardsScreen() {
               </ThemedView>
             }
             renderItem={({ item }) => (
-              <FlashcardRow
-                card={item}
-                selecting={mode === 'edit'}
-                selected={selectedIds.has(item.id)}
-                onToggleSelect={() => toggleCard(item.id)}
-                onInspect={() => router.push(`/cards/${item.id}` as Href)}
-                onEdit={() => router.push(`/cards/${item.id}/edit` as Href)}
-              />
+              <View
+                collapsable={false}
+                onLayout={(event) => onItemLayout(item.id, event.nativeEvent.layout.height)}>
+                <FlashcardRow
+                  card={item}
+                  tapAction={mode === 'list' ? 'select' : 'open'}
+                  selected={mode === 'list' && selectedIds.has(item.id)}
+                  pressAccessibilityHint={
+                    mode === 'list'
+                      ? undefined
+                      : mode === 'edit'
+                        ? 'Abre la edición de la tarjeta'
+                        : 'Abre la tarjeta'
+                  }
+                  onPress={() => {
+                    if (mode === 'list') {
+                      toggleSelectedCard(item.id);
+                      return;
+                    }
+                    router.push((mode === 'edit' ? `/cards/${item.id}/edit` : `/cards/${item.id}`) as Href);
+                  }}
+                />
+              </View>
             )}
           />
           {showScrollTop ? <ScrollToTopButton onPress={scrollToTop} /> : null}

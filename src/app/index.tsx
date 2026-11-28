@@ -91,6 +91,8 @@ export default function HomeScreen() {
         <FlatList
           data={decks ?? []}
           keyExtractor={(item) => item.id}
+          directionalLockEnabled
+          removeClippedSubviews={false}
           contentContainerStyle={styles.list}
           refreshControl={
             <RefreshControl

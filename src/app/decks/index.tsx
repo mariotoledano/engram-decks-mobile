@@ -6,6 +6,7 @@ import {
   RefreshControl,
   StyleSheet,
   TextInput,
+  View,
   type NativeScrollEvent,
   type NativeSyntheticEvent,
 } from 'react-native';
@@ -18,10 +19,12 @@ import { SCROLL_TOP_OFFSET, ScrollToTopButton } from '@/components/scroll-to-top
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { MaxContentWidth, Spacing } from '@/constants/theme';
+import { usePinnedSelectionList } from '@/hooks/use-pinned-selection-list';
 import { useTheme } from '@/hooks/use-theme';
 import { listDecks } from '@/services/decks';
 import type { Deck } from '@/types/api';
 import { editDeckHref, normalizeSearchText, searchDeckHref, searchDecks, studyDeckHref } from '@/utils/decks';
+import { EMPTY_SELECTION } from '@/utils/pinned-selection';
 import { requestErrorMessage } from '@/utils/request-feedback';
 
 function resultLabel(count: number): string {
@@ -68,12 +71,12 @@ function DeckSearchBar({ value, onChange }: DeckSearchBarProps) {
 export default function DecksScreen() {
   const theme = useTheme();
   const navigation = useNavigation();
-  const listRef = useRef<FlatList<Deck>>(null);
   const decksRef = useRef<Deck[] | null>(null);
   const [decks, setDecks] = useState<Deck[] | null>(null);
   const [showScrollTop, setShowScrollTop] = useState(false);
   const [query, setQuery] = useState('');
   const [mode, setMode] = useState<DeckMode>('study');
+  const [selectedIds, setSelectedIds] = useState<ReadonlySet<string>>(() => new Set());
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -83,7 +86,6 @@ export default function DecksScreen() {
   useLayoutEffect(() => {
     navigation.setOptions({
       headerRight: () => <DeckModeSwitch value={mode} onChange={setMode} />,
-      headerRightContainerStyle: { paddingRight: Spacing.three },
     });
   }, [navigation, mode]);
 
@@ -113,13 +115,42 @@ export default function DecksScreen() {
     }, [loadDecks]),
   );
 
-  const onListScroll = useCallback((event: NativeSyntheticEvent<NativeScrollEvent>) => {
-    const visible = event.nativeEvent.contentOffset.y > SCROLL_TOP_OFFSET;
-    setShowScrollTop((current) => (current === visible ? current : visible));
-  }, []);
+  const pinnedIds = mode === 'list' ? selectedIds : EMPTY_SELECTION;
+  const {
+    listRef,
+    ordered: listedDecks,
+    onScroll: trackListScroll,
+    onScrollBeginDrag: releaseCameraLock,
+    onContentSizeChange: holdCamera,
+    onItemLayout,
+    wrapHeader,
+    releaseCameraLock: unlockCamera,
+  } = usePinnedSelectionList(visibleDecks, pinnedIds);
+
+  const onListScroll = useCallback(
+    (event: NativeSyntheticEvent<NativeScrollEvent>) => {
+      trackListScroll(event);
+      const visible = event.nativeEvent.contentOffset.y > SCROLL_TOP_OFFSET;
+      setShowScrollTop((current) => (current === visible ? current : visible));
+    },
+    [trackListScroll],
+  );
 
   const scrollToTop = useCallback(() => {
+    unlockCamera();
     listRef.current?.scrollToOffset({ offset: 0, animated: true });
+  }, [listRef, unlockCamera]);
+
+  const toggleSelectedDeck = useCallback((id: string) => {
+    setSelectedIds((current) => {
+      const next = new Set(current);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
+      return next;
+    });
   }, []);
 
   const listHeader =
@@ -155,13 +186,17 @@ export default function DecksScreen() {
           <FlatList
             ref={listRef}
             style={styles.listFlex}
-            data={visibleDecks}
-            extraData={mode}
+            data={listedDecks}
+            extraData={{ mode, selectedIds }}
             keyExtractor={(item) => item.id}
             keyboardShouldPersistTaps="handled"
+            directionalLockEnabled
+            removeClippedSubviews={false}
             contentContainerStyle={styles.list}
             scrollEventThrottle={16}
             onScroll={onListScroll}
+            onScrollBeginDrag={releaseCameraLock}
+            onContentSizeChange={holdCamera}
             refreshControl={
               <RefreshControl
                 refreshing={refreshing}
@@ -170,7 +205,7 @@ export default function DecksScreen() {
                 colors={[theme.text]}
               />
             }
-            ListHeaderComponent={listHeader ?? undefined}
+            ListHeaderComponent={wrapHeader(listHeader)}
             ListEmptyComponent={
               <ThemedView style={styles.empty}>
                 {searching ? (
@@ -184,12 +219,24 @@ export default function DecksScreen() {
               </ThemedView>
             }
             renderItem={({ item }) => (
-              <DeckCard
-                deck={item}
-                href={
-                  mode === 'study' ? studyDeckHref(item) : mode === 'search' ? searchDeckHref(item) : editDeckHref(item)
-                }
-              />
+              <View
+                collapsable={false}
+                onLayout={(event) => onItemLayout(item.id, event.nativeEvent.layout.height)}>
+                <DeckCard
+                  deck={item}
+                  selected={mode === 'list' && selectedIds.has(item.id)}
+                  href={
+                    mode === 'list'
+                      ? undefined
+                      : mode === 'study'
+                        ? studyDeckHref(item)
+                        : mode === 'search'
+                          ? searchDeckHref(item)
+                          : editDeckHref(item)
+                  }
+                  onPress={mode === 'list' ? () => toggleSelectedDeck(item.id) : undefined}
+                />
+              </View>
             )}
           />
           {showScrollTop ? <ScrollToTopButton onPress={scrollToTop} /> : null}

@@ -1,15 +1,16 @@
 import { StyleSheet, View } from 'react-native';
 
 import { IconButton } from '@/components/icon-button';
-import { EditSheetIcon, OpenBookIcon, SearchIcon } from '@/components/icons';
+import { BulletListIcon, EditSheetIcon, OpenBookIcon, SearchIcon } from '@/components/icons';
 import { Spacing } from '@/constants/theme';
 
-export type DeckMode = 'study' | 'search' | 'edit';
+export type DeckMode = 'study' | 'search' | 'edit' | 'list';
 
 const MODES = [
   { id: 'study', label: 'Estudio de mazos', icon: OpenBookIcon },
   { id: 'search', label: 'Búsqueda de mazos', icon: SearchIcon },
   { id: 'edit', label: 'Edición de mazos', icon: EditSheetIcon },
+  { id: 'list', label: 'Edición de lista', icon: BulletListIcon },
 ] as const;
 
 interface DeckModeSwitchProps {

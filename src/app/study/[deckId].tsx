@@ -7,7 +7,6 @@ import { LoadingView } from '@/components/loading-view';
 import { StudyModeSwitch, type StudyMode } from '@/components/study-mode-switch';
 import { StudySession } from '@/components/study-session';
 import { ThemedView } from '@/components/themed-view';
-import { Spacing } from '@/constants/theme';
 import { listFlashcardsByDeck } from '@/services/flashcards';
 import type { Flashcard } from '@/types/api';
 import { shuffleFlashcards } from '@/utils/flashcards';
@@ -34,7 +33,6 @@ export default function StudyScreen() {
     navigation.setOptions({
       title: deckName.length > 0 ? deckName : 'Estudio',
       headerRight: () => <StudyModeSwitch value={mode} onChange={setMode} />,
-      headerRightContainerStyle: { paddingRight: Spacing.three },
     });
   }, [navigation, deckName, mode]);
 

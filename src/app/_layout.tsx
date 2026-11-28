@@ -7,6 +7,7 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
 import { BackLink } from '@/components/back-link';
 import { HomeBackLink } from '@/components/home-back-link';
+import { ScreenHeader } from '@/components/screen-header';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useTheme } from '@/hooks/use-theme';
 
@@ -25,6 +26,7 @@ export default function RootLayout() {
       <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
         <Stack
           screenOptions={{
+            header: ScreenHeader,
             headerStyle: { backgroundColor: theme.background },
             headerTintColor: theme.text,
             headerTitleStyle: { color: theme.text },
